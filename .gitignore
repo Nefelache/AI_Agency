@@ -1,0 +1,25 @@
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Project data
+data/
+*.sqlite3
+
+# VSCode / PyCharm 等编辑器配置（按需）
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
