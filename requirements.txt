@@ -1,0 +1,23 @@
+# Agent OS — Dependencies
+# Install: pip install -r requirements.txt
+
+# --- API Gateway ---
+fastapi
+uvicorn[standard]
+pydantic-settings
+
+# --- LLM ---
+httpx
+
+# --- Memory Layer ---
+aiosqlite
+
+# --- Prompt Management ---
+pyyaml
+
+# --- Testing ---
+pytest
+pytest-asyncio
+
+# --- Reserved: Edge / IoT ---
+# paho-mqtt

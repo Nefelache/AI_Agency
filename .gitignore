@@ -1,0 +1,25 @@
+# Secrets
+.env
+my_agent_os/config/.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+dist/
+*.egg-info/
+
+# Memory system data (SQLite + ChromaDB)
+my_agent_os/memory_layer/data/
+my_agent_os/memory_layer/vector_db/chroma_data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

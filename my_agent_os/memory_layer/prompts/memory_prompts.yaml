@@ -1,0 +1,90 @@
+# ============================================================
+# Memory Pipeline Prompts
+# ============================================================
+# All LLM instructions for the memory subsystem live here.
+# Never hard-code prompts in Python. Modify THIS file only.
+# ============================================================
+
+extraction: |
+  You are a memory extraction engine. Analyze the conversation below
+  and extract structured memories. Be precise and concise.
+
+  For each turn, identify:
+  1. FACTS: Concrete, verifiable statements or decisions (→ semantic memory).
+     Examples: "budget is 150k", "allergic to alcohol", "chose vendor B".
+  2. EVENTS: Specific actions or occurrences with temporal context (→ episodic memory).
+     Examples: "signed the Q3 contract on March 3", "meeting postponed to Friday".
+  3. PATTERNS: Recurring behaviors, preferences, or routines (→ procedural memory).
+     Examples: "user prefers morning meetings", "always asks for low-sugar options".
+  4. ENTITIES: Key nouns, names, or topics for indexing.
+     Examples: "Q3 contract", "vendor B", "budget".
+  5. SHOULD_SEAL: Is this conversation topic concluded? (true/false)
+     A topic is concluded when the user received a definitive answer,
+     made a final decision, or explicitly moved on.
+  6. TOPIC: A short phrase describing the conversation's main subject.
+
+  Conversation:
+  {conversation}
+
+  Respond with ONLY a JSON object:
+  {
+    "facts": [{"content": "...", "confidence": 0.0-1.0}],
+    "events": [{"content": "...", "timestamp_hint": "..."}],
+    "patterns": [{"content": "...", "frequency": "once|recurring"}],
+    "entities": ["entity1", "entity2"],
+    "should_seal": false,
+    "topic": "..."
+  }
+
+consolidation: |
+  You are a memory consolidation engine. Compare a NEW memory candidate
+  against EXISTING related memories and decide the correct operation.
+
+  Operations:
+  - ADD: This is genuinely new information not covered by existing memories.
+  - UPDATE: This refines, corrects, or extends an existing memory.
+    Provide the memory_id to update and the new merged content.
+  - DELETE: This directly contradicts an existing memory, making it obsolete.
+    Provide the memory_id to delete.
+  - NOOP: This information is already captured. No change needed.
+
+  NEW CANDIDATE:
+  {candidate}
+
+  EXISTING RELATED MEMORIES:
+  {existing}
+
+  Respond with ONLY a JSON object:
+  {
+    "operation": "add|update|delete|noop",
+    "memory_id": null,
+    "content": "the final merged content if add/update, else null",
+    "reason": "brief explanation"
+  }
+
+summarization: |
+  Summarize this completed conversation session.
+
+  Produce:
+  1. A 2-3 sentence summary capturing the essence.
+  2. Key decisions or conclusions (list of short strings).
+  3. The main topic (a single short phrase).
+
+  Conversation turns:
+  {turns}
+
+  Respond with ONLY a JSON object:
+  {
+    "summary": "...",
+    "key_decisions": ["decision 1", "decision 2"],
+    "topic": "..."
+  }
+
+entity_extraction: |
+  Extract the key entities and topics from this query for memory lookup.
+  Return only the most specific, meaningful terms (not stop words).
+
+  Query: {query}
+
+  Respond with ONLY a JSON object:
+  {"entities": ["entity1", "entity2"]}
