@@ -13,6 +13,10 @@ dist/
 
 # Memory system data (SQLite + ChromaDB)
 my_agent_os/memory_layer/data/
+
+# WhatsApp bridge
+channels/whatsapp-bridge/auth/
+channels/whatsapp-bridge/node_modules/
 my_agent_os/memory_layer/vector_db/chroma_data/
 
 # IDE

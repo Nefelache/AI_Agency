@@ -1,0 +1,9 @@
+.venv
+__pycache__
+.pytest_cache
+.cursor
+.git
+channels/whatsapp-bridge/node_modules
+channels/whatsapp-bridge/auth
+my_agent_os/memory_layer/data
+

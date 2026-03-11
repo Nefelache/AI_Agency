@@ -1,0 +1,7 @@
+{$DOMAIN} {
+  encode gzip
+
+  # Reverse proxy to Agent OS
+  reverse_proxy agent-os:8000
+}
+

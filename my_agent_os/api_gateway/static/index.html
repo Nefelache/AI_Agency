@@ -161,6 +161,13 @@
   }
   #input-bar textarea:focus{border-color:var(--accent-dim)}
   #input-bar textarea::placeholder{color:var(--text-dim)}
+  #input-bar .crew-check{
+    display:flex;align-items:center;gap:6px;
+    font-size:11px;color:var(--text-dim);cursor:pointer;
+    font-family:var(--font-mono);user-select:none;flex-shrink:0;
+  }
+  #input-bar .crew-check input{accent-color:var(--accent)}
+  #input-bar .crew-check:hover{color:var(--accent)}
 
   #input-bar button{
     align-self:flex-end;padding:12px 20px;border:none;border-radius:10px;
@@ -268,6 +275,10 @@
     </div>
 
     <div id="input-bar">
+      <label class="crew-check" title="强制使用多部门讨论，展示 Department Views">
+        <input type="checkbox" id="force-crew" />
+        <span>Multi-Agent</span>
+      </label>
       <textarea id="input" rows="1" placeholder="Say something..." autofocus></textarea>
       <button id="send" onclick="send()">Send</button>
     </div>
@@ -399,8 +410,8 @@ function appendMsg(role, content, actions, crewViews) {
   if (crewViews && Object.keys(crewViews).length) {
     const uid = 'crew-' + Date.now();
     html += `<div class="crew-panel">`;
-    html += `<span class="crew-toggle" onclick="document.getElementById('${uid}').classList.toggle('hidden')">Department Views</span>`;
-    html += `<div class="crew-views hidden" id="${uid}">`;
+    html += `<span class="crew-toggle" onclick="document.getElementById('${uid}').classList.toggle('hidden')">▼ Department Views</span>`;
+    html += `<div class="crew-views" id="${uid}">`;
     for (const [dept, view] of Object.entries(crewViews)) {
       html += `<div class="crew-view"><div class="dept">${escapeHtml(dept)}</div>${escapeHtml(view)}</div>`;
     }
@@ -440,7 +451,11 @@ async function send() {
     const res = await fetch('/console/query', {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ query: text, include_memory: true }),
+      body: JSON.stringify({
+        query: text,
+        include_memory: true,
+        force_crew: document.getElementById('force-crew').checked,
+      }),
     });
     hideTyping();
 

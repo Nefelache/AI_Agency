@@ -3,6 +3,8 @@
 A fully local, privacy-first AI command center for high-performance individuals.
 Designed to eliminate **Task Paralysis** through calm, intelligent automation.
 
+**OpenClaw-inspired**: WhatsApp integration (QR link), enterprise-grade audit, DM/group policies, retry.
+
 ## Architecture
 
 ```
@@ -12,7 +14,11 @@ my_agent_os/
 ├── memory_layer/         Memory (Document Parser + Local Vector DB)
 ├── skills_layer/         Limbs (Stateless, hot-pluggable tool plugins)
 ├── config/               Settings + Environment
+├── enterprise/           Audit logging, policies
 └── tests/                Unit tests
+
+channels/
+└── whatsapp-bridge/      Baileys Node.js bridge (QR code login)
 ```
 
 ## Design Philosophy
@@ -45,6 +51,55 @@ pytest my_agent_os/tests/ -v
 1. Create a file in `my_agent_os/skills_layer/tools/` (e.g. `weather.py`).
 2. Subclass `Skill`, apply the `@register` decorator.
 3. Done. The router can now dispatch to it. No trunk code changes needed.
+
+## WhatsApp Integration (OpenClaw-style)
+
+Link WhatsApp via QR code — no Meta Business API needed.
+
+### 1. Configure allowlist
+
+Add your phone number (E.164) to `.env`:
+
+```bash
+WHATSAPP_ALLOW_FROM=+15551234567,+8613800138000
+WHATSAPP_BRIDGE_SECRET=your-random-secret  # Optional: for bridge auth
+```
+
+Or edit `my_agent_os/config/channels.yaml` → `whatsapp.allow_from`.
+
+### 2. Start Agent OS
+
+```bash
+python run.py   # or: uvicorn my_agent_os.api_gateway.main:app --reload
+```
+
+### 3. Start WhatsApp Bridge
+
+```bash
+cd channels/whatsapp-bridge
+npm install
+AGENT_OS_URL=http://127.0.0.1:8000 \
+AGENT_OS_SECRET=your-random-secret \
+  npm start
+```
+
+Scan the QR code with WhatsApp. Message the linked number — the agent replies.
+
+**Alternative auth**: Use `API_KEY_CHANNEL` as `X-API-Key` header instead of `AGENT_OS_SECRET`.
+
+---
+
+## Enterprise Features
+
+| Feature | Implementation |
+|---------|----------------|
+| **Audit logging** | ISO 8601 timestamps, JSONL daily files in `memory_layer/data/audit/` |
+| **DM/Group policies** | allowlist, pairing, open, disabled — via `channels.yaml` |
+| **Retry** | LLM calls: 3 attempts, exponential backoff with jitter |
+| **Session isolation** | Per-channel, per-user IDs (`whatsapp:+1555...`, `console:owner`) |
+| **Rate limiting** | Sliding window per API key (configurable) |
+
+---
 
 ## Customizing for a New Client
 

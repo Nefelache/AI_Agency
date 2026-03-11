@@ -1,0 +1,55 @@
+services:
+  agent-os:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # Server
+      - HOST=0.0.0.0
+      - PORT=8000
+      # LLM + Auth + WhatsApp policies are read from my_agent_os/config/.env (mounted below)
+    volumes:
+      # Persist SQLite + audit logs inside workspace data dir
+      - ./my_agent_os/memory_layer/data:/app/my_agent_os/memory_layer/data
+      # Provide config .env to container
+      - ./my_agent_os/config/.env:/app/my_agent_os/config/.env:ro
+      - ./my_agent_os/config/channels.yaml:/app/my_agent_os/config/channels.yaml:ro
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  whatsapp-bridge:
+    build:
+      context: ./channels/whatsapp-bridge
+      dockerfile: Dockerfile
+    environment:
+      - AGENT_OS_URL=http://agent-os:8000
+      - AGENT_OS_SECRET=${WHATSAPP_BRIDGE_SECRET}
+      - LOG_LEVEL=info
+      - HEARTBEAT_SECONDS=30
+    volumes:
+      # Persist QR link session
+      - ./channels/whatsapp-bridge/auth:/app/auth
+    depends_on:
+      - agent-os
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - agent-os
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
+

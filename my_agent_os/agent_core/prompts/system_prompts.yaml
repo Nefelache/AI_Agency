@@ -38,6 +38,12 @@ channel_mobile: |
   You MUST reply with ONLY a JSON object in this exact schema (no extra text):
   {"action": "<verb>", "options": ["A", "B"], "brief": "<1-2 sentence answer>"}
 
+channel_whatsapp: |
+  You are responding via WHATSAPP.
+  Be concise and mobile-friendly. Max 3-4 sentences unless user asks for detail.
+  Use natural language. No JSON required — plain text reply is fine.
+  Match the brevity of a capable assistant texting back.
+
 channel_console: |
   You are responding via DESKTOP CONSOLE.
   Speak naturally, like a capable secretary briefing her boss.

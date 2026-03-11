@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import yaml
 from pathlib import Path
 from typing import Any
@@ -54,6 +55,8 @@ def _build_system_message(prompts: dict, channel: str) -> str:
     channel_key = f"channel_{channel}"
     if channel_key in prompts:
         parts.append(prompts[channel_key])
+    elif channel == "whatsapp" and "channel_mobile" in prompts:
+        parts.append(prompts["channel_mobile"])
     return "\n".join(parts)
 
 
@@ -62,7 +65,11 @@ async def route(
     channel: str,
     user_id: str,
     with_memory: bool = True,
+    force_crew: bool = False,
 ) -> dict[str, Any]:
+    start_ts = time.perf_counter()
+    session_id = f"{channel}:{user_id}"
+
     prompts = _load_prompts()
     system_msg = _build_system_message(prompts, channel)
     preferences = prompts.get("preferences", {})
@@ -85,11 +92,12 @@ async def route(
     )
 
     # Complexity routing: crew or single agent
-    crew_views = None
     if _crew_orchestrator and channel == "console":
+        if force_crew:
+            return await _route_via_crew(raw_input, user_id, system_msg, user_payload_parts, channel, start_ts)
         complexity = await _check_complexity(raw_input)
         if complexity >= CREW_COMPLEXITY_THRESHOLD:
-            return await _route_via_crew(raw_input, user_id, system_msg, user_payload_parts, channel)
+            return await _route_via_crew(raw_input, user_id, system_msg, user_payload_parts, channel, start_ts)
 
     # Single-agent path
     raw_response = await call_llm(
@@ -102,6 +110,21 @@ async def route(
     if _memory_engine:
         answer = parsed.get("answer") or parsed.get("brief") or ""
         _memory_engine.process_turn_background(user_id, raw_input, answer)
+
+    latency_ms = (time.perf_counter() - start_ts) * 1000
+    try:
+        from my_agent_os.enterprise.audit import log_route
+
+        log_route(
+            session_id=session_id,
+            channel=channel,
+            user_id=user_id,
+            raw_input=raw_input,
+            response=parsed,
+            latency_ms=round(latency_ms, 2),
+        )
+    except Exception as e:
+        logger.debug("Audit log skip: %s", e)
 
     return parsed
 
@@ -121,6 +144,7 @@ async def _route_via_crew(
     system_msg: str,
     user_payload_parts: list[str],
     channel: str,
+    start_ts: float | None = None,
 ) -> dict[str, Any]:
     """Run multi-agent crew discussion and return structured result."""
     try:
@@ -146,6 +170,22 @@ async def _route_via_crew(
     if _memory_engine:
         answer = parsed.get("answer") or ""
         _memory_engine.process_turn_background(user_id, raw_input, answer)
+
+    if start_ts is not None:
+        latency_ms = (time.perf_counter() - start_ts) * 1000
+        try:
+            from my_agent_os.enterprise.audit import log_route
+
+            log_route(
+                session_id=f"{channel}:{user_id}",
+                channel=channel,
+                user_id=user_id,
+                raw_input=raw_input,
+                response=parsed,
+                latency_ms=round(latency_ms, 2),
+            )
+        except Exception as e:
+            logger.debug("Audit log skip: %s", e)
 
     return parsed
 

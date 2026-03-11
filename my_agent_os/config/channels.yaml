@@ -1,0 +1,28 @@
+# Channel Configuration — OpenClaw-style policies
+# DM/Group access control, pairing, allowlists
+
+whatsapp:
+  enabled: true
+  # DM policy: pairing | allowlist | open | disabled
+  dm_policy: "allowlist"
+  # E.164 phone numbers allowed for DM (empty = use allowFrom from env)
+  allow_from: []  # e.g. ["+15551234567"]
+  # Group policy: allowlist | open | disabled
+  group_policy: "allowlist"
+  group_allow_from: []
+  # Text chunk limit for long replies (WhatsApp ~4096 char limit)
+  text_chunk_limit: 4000
+  chunk_mode: "newline"  # newline | length
+  # Media size limit (MB)
+  media_max_mb: 50
+  send_read_receipts: true
+  # Ack reaction on receipt (emoji)
+  ack_reaction:
+    emoji: "👀"
+    direct: true
+    group: "mentions"  # always | mentions | never
+
+# Pairing store for dm_policy: pairing (codes expire in 1h)
+pairing:
+  max_pending_per_channel: 3
+  expiry_hours: 1

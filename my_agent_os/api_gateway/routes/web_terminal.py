@@ -17,6 +17,7 @@ router = APIRouter(dependencies=[Depends(rate_limit_check)])
 class ConsoleQuery(BaseModel):
     query: str = Field(..., description="Free-form deep query from the web console")
     include_memory: bool = Field(True, description="Pull related docs from memory_layer")
+    force_crew: bool = Field(False, description="Force multi-agent crew (show Department Views)")
 
 
 class ConsoleResponse(BaseModel):
@@ -38,6 +39,7 @@ async def handle_console(
         channel="console",
         user_id=auth.user_id,
         with_memory=q.include_memory,
+        force_crew=q.force_crew,
     )
     return ConsoleResponse(
         answer=result.get("answer", ""),

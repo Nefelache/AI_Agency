@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from my_agent_os.api_gateway.routes import mobile_webhook, web_terminal, memory_api
+from my_agent_os.api_gateway.routes import mobile_webhook, web_terminal, memory_api, whatsapp, health_ext, audit_api
 from my_agent_os.config.settings import settings
 
 _STATIC_DIR = Path(__file__).parent / "static"
@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     from my_agent_os.agent_core.router_engine import set_memory_engine, set_crew_orchestrator
     from my_agent_os.memory_layer.engine import MemoryEngine
     from my_agent_os.agent_core.crew.orchestrator import CrewOrchestrator
+    from my_agent_os.enterprise.audit import prune_retention
 
     engine = MemoryEngine(
         db_path=settings.MEMORY_DB_PATH,
@@ -43,6 +44,12 @@ async def lifespan(app: FastAPI):
     set_memory_engine(engine)
     set_crew_orchestrator(crew)
     memory_api.set_engine(engine)
+
+    # Enterprise: prune old audit logs on startup (best-effort)
+    try:
+        prune_retention()
+    except Exception:
+        pass
 
     yield
 
@@ -65,6 +72,9 @@ app.add_middleware(
 app.include_router(mobile_webhook.router, prefix="/mobile", tags=["Mobile"])
 app.include_router(web_terminal.router, prefix="/console", tags=["Console"])
 app.include_router(memory_api.router, prefix="/memory", tags=["Memory"])
+app.include_router(whatsapp.router)
+app.include_router(health_ext.router, tags=["Health"])
+app.include_router(audit_api.router)
 
 
 @app.get("/")

@@ -43,12 +43,25 @@ class Settings(BaseSettings):
     MEMORY_PRIORITY_DECAY_DAYS: float = 7.0
     MEMORY_MAX_INJECTION_CHARS: int = 2000
 
+    # --- Enterprise: Audit ---
+    AUDIT_ENABLED: bool = True
+    AUDIT_RETENTION_DAYS: int = 90
+
     # --- Network Proxy (for regions with restricted access) ---
     HTTPS_PROXY: str = ""
 
     # --- MQTT (reserved for edge devices) ---
     MQTT_BROKER: str = "localhost"
     MQTT_PORT: int = 1883
+
+    # --- WhatsApp ---
+    WHATSAPP_BRIDGE_SECRET: str = ""  # Shared secret for Baileys bridge
+    WHATSAPP_ALLOW_FROM: str = ""  # Comma-separated E.164 numbers (e.g. +15551234567,+8613800138000)
+    # Cloud API (PyWa) — optional, for Meta Business
+    WHATSAPP_PHONE_ID: str = ""
+    WHATSAPP_ACCESS_TOKEN: str = ""
+    WHATSAPP_VERIFY_TOKEN: str = "agent-os-verify"
+    WHATSAPP_BUSINESS_ACCOUNT_ID: str = ""
 
 
 settings = Settings()
