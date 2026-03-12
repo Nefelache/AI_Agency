@@ -33,16 +33,19 @@ channels/
 ## Quick Start
 
 ```bash
-# 1. Create virtual environment
+# 1. 交互式配置（推荐）
+python setup.py
+
+# 2. Create virtual environment
 python -m venv .venv && source .venv/bin/activate
 
-# 2. Install dependencies
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# 3. Start the gateway
-uvicorn my_agent_os.api_gateway.main:app --reload
+# 4. Start the gateway
+python run.py
 
-# 4. Run tests
+# 5. Run tests
 pytest my_agent_os/tests/ -v
 ```
 

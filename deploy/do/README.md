@@ -30,23 +30,15 @@ Clone or upload this repository to the droplet (recommended: git).
 
 ## 3. Configure environment
 
-Create `my_agent_os/config/.env` based on `my_agent_os/config/.env.example`.
-
-Minimum required:
-
-- `DEEPSEEK_API_KEY`
-- `API_KEY_OWNER`, `API_KEY_CHANNEL`, `API_KEY_GUEST`
-- `WHATSAPP_ALLOW_FROM`
-- `WHATSAPP_BRIDGE_SECRET`
-
-Create a Compose `.env` file in repo root for domain + bridge secret:
+**交互式配置（推荐）：**
 
 ```bash
-cat > .env <<'EOF'
-DOMAIN=your.domain.com
-WHATSAPP_BRIDGE_SECRET=your-random-secret
-EOF
+cd /opt/agent-os
+python3 setup.py
 ```
+
+按提示输入 DeepSeek API Key、手机号等，回车可自动生成 API 密钥。  
+或手动复制并编辑：`cp my_agent_os/config/.env.example my_agent_os/config/.env`
 
 ## 4. Start the stack
 

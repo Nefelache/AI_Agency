@@ -3,13 +3,13 @@ Memory Reader — Dual-layer retrieval + pyramid injection.
 
 Retrieval:
   Layer 1 (Hash)  → O(1) entity-based deterministic lookup
-  Layer 2 (Vector) → semantic similarity fuzzy matching
+  Layer 2 (FTS)   → full-text search
   Merge + Priority Rank → top-k selection
 
-Injection (anti-hallucination pyramid):
-  Level 1: summaries only        (default, lightest)
-  Level 2: + key decisions       (medium)
-  Level 3: + raw content excerpts (only when depth is needed)
+Injection (anti-hallucination pyramid + dynamic allocation):
+  - Query-aware budget: higher query_relevance → more chars allocated
+  - Adaptive depth: summary only | + key_points | + excerpt, by budget
+  - Reduces information loss for high-relevance memories
 """
 
 from __future__ import annotations
@@ -123,6 +123,7 @@ class MemoryReader:
                 scored[mid] = RetrievedMemory(
                     record=record,
                     relevance_score=0.0,
+                    query_relevance=0.5,  # Hash hit: assume medium query relevance
                     source="hash",
                 )
 
@@ -130,6 +131,7 @@ class MemoryReader:
             similarity = max(0.0, 1.0 / (1.0 + abs(rank)))
             if mid in scored:
                 scored[mid].relevance_score = similarity
+                scored[mid].query_relevance = similarity
                 scored[mid].source = "both"
             else:
                 record = await self._store.get_memory(mid)
@@ -137,6 +139,7 @@ class MemoryReader:
                     scored[mid] = RetrievedMemory(
                         record=record,
                         relevance_score=similarity,
+                        query_relevance=similarity,
                         source="vector",
                     )
 
@@ -171,11 +174,19 @@ class MemoryReader:
             + 0.05 * r.priority
         )
 
-    # ── Pyramid Injection Builder ────────────────────────
+    # ── Pyramid Injection Builder (query-aware, adaptive depth) ───
 
     def _build_injection(self, memories: list[RetrievedMemory]) -> InjectionContext:
         if not memories:
             return InjectionContext()
+
+        # Query-aware budget allocation: higher query_relevance → more chars
+        weights = [max(0.2, rm.query_relevance) for rm in memories]
+        total_weight = sum(weights)
+        budgets = [max(60, int(w / total_weight * self._max_chars)) for w in weights]
+        if sum(budgets) > self._max_chars:
+            scale = self._max_chars / sum(budgets)
+            budgets = [max(40, int(b * scale)) for b in budgets]
 
         summary_parts: list[str] = []
         decision_parts: list[str] = []
@@ -183,25 +194,34 @@ class MemoryReader:
         source_ids: list[str] = []
         total_chars = 0
 
-        for rm in memories:
+        for rm, budget in zip(memories, budgets):
             r = rm.record
             source_ids.append(r.id)
+            used = 0
 
+            # Level 1: summary (always)
             s = r.summary or r.content[:150]
             summary_parts.append(f"- [{r.memory_type.value}] {s}")
-            total_chars += len(s)
+            used += len(s)
 
-            if r.key_points and total_chars < self._max_chars:
+            # Level 2: key_points (optional, by budget)
+            if r.key_points and used < budget:
                 for kp in r.key_points:
                     decision_parts.append(f"  * {kp}")
-                    total_chars += len(kp)
+                    used += len(kp)
+                    if used >= budget:
+                        break
 
-            if total_chars < self._max_chars * 1.5:
-                excerpt = r.content[:300]
-                if len(r.content) > 300:
+            # Level 3: excerpt (optional, by budget)
+            if used < budget and budget >= 200:
+                excerpt_len = min(300, budget - used)
+                excerpt = r.content[:excerpt_len]
+                if len(r.content) > excerpt_len:
                     excerpt += "..."
                 detail_parts.append(f"  [{r.id[:8]}] {excerpt}")
-                total_chars += len(excerpt)
+                used += len(excerpt)
+
+            total_chars += used
 
         return InjectionContext(
             summary_layer="\n".join(summary_parts),

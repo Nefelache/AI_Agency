@@ -45,17 +45,18 @@ else
   cd "$TARGET"
 fi
 
-# Ensure config exists
+# Ensure config exists (run interactive setup if missing)
 if [[ ! -f my_agent_os/config/.env ]]; then
-  cp my_agent_os/config/.env.example my_agent_os/config/.env
-  echo "Created my_agent_os/config/.env - EDIT IT with your keys before starting!"
-  echo "Required: DEEPSEEK_API_KEY, API_KEY_OWNER, API_KEY_CHANNEL, WHATSAPP_ALLOW_FROM, WHATSAPP_BRIDGE_SECRET"
-  exit 1
+  echo "未找到配置文件，启动交互式配置..."
+  python3 setup.py || {
+    echo "或手动复制: cp my_agent_os/config/.env.example my_agent_os/config/.env"
+    exit 1
+  }
 fi
 
 # Compose .env
 if [[ ! -f .env ]]; then
-  SECRET=$(grep WHATSAPP_BRIDGE_SECRET my_agent_os/config/.env | cut -d= -f2)
+  SECRET=$(grep WHATSAPP_BRIDGE_SECRET my_agent_os/config/.env 2>/dev/null | cut -d= -f2)
   cat > .env <<EOF
 DOMAIN=localhost
 WHATSAPP_BRIDGE_SECRET=${SECRET:-changeme}

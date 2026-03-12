@@ -122,7 +122,8 @@ class ConsolidationDecision(BaseModel):
 class RetrievedMemory(BaseModel):
     """A memory record annotated with retrieval metadata."""
     record: MemoryRecord
-    relevance_score: float = 0.0
+    relevance_score: float = 0.0  # Final priority for ranking (includes recency, etc.)
+    query_relevance: float = 0.0  # Raw query similarity, for budget allocation
     source: str = "vector"  # "hash" | "vector" | "both"
 
 
