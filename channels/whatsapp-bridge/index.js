@@ -85,7 +85,8 @@ async function startOnce() {
 
   const sock = makeWASocket({
     auth: state,
-    version: [2, 3000, 1029620931],
+    // WhatsApp Web version — expires ~2mo; update from https://wppconnect.io/whatsapp-versions/
+    version: [2, 3000, 1035023383],
     printQRInTerminal: false,
     logger,
   });

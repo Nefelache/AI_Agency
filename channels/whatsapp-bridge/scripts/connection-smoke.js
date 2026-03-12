@@ -12,7 +12,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const WA_VERSION = [2, 3000, 1029620931];
+const WA_VERSION = [2, 3000, 1035023383];
 const TIMEOUT_MS = 25_000;
 
 async function run() {
