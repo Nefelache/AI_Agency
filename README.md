@@ -89,6 +89,12 @@ AGENT_OS_SECRET=your-random-secret \
 
 Scan the QR code with WhatsApp. Message the linked number — the agent replies.
 
+**Self-chat only** (one account, "message yourself" only): Add to `.env`:
+```bash
+SELF_CHAT_ONLY=+8613800138000
+```
+Only the "message yourself" chat triggers the AI. All other DMs are ignored.
+
 **Alternative auth**: Use `API_KEY_CHANNEL` as `X-API-Key` header instead of `AGENT_OS_SECRET`.
 
 ### WhatsApp Bridge tests

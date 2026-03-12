@@ -27,6 +27,7 @@ services:
       - AGENT_OS_SECRET=${WHATSAPP_BRIDGE_SECRET}
       - LOG_LEVEL=info
       - HEARTBEAT_SECONDS=30
+      - SELF_CHAT_ONLY=${SELF_CHAT_ONLY}
     volumes:
       # Persist QR link session
       - ./channels/whatsapp-bridge/auth:/app/auth

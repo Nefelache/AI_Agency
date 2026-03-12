@@ -72,11 +72,11 @@ def _write_config(cfg: dict[str, str]) -> None:
     print(f"  已写入 {CONFIG_ENV}")
 
 
-def _write_compose_env(bridge_secret: str) -> None:
-    content = f"""DOMAIN=localhost
-WHATSAPP_BRIDGE_SECRET={bridge_secret}
-"""
-    COMPOSE_ENV.write_text(content)
+def _write_compose_env(bridge_secret: str, self_chat_only: str = "") -> None:
+    lines = ["DOMAIN=localhost", f"WHATSAPP_BRIDGE_SECRET={bridge_secret}"]
+    if self_chat_only:
+        lines.append(f"SELF_CHAT_ONLY={self_chat_only}")
+    COMPOSE_ENV.write_text("\n".join(lines) + "\n")
     print(f"  已写入 {COMPOSE_ENV}")
 
 
@@ -107,8 +107,14 @@ def run_setup() -> dict[str, str]:
     val = _prompt("WHATSAPP_BRIDGE_SECRET（回车=自动生成）：", default=bridge_secret)
     cfg["WHATSAPP_BRIDGE_SECRET"] = val or _gen_key()
 
+    self_chat = _prompt(
+        "仅处理「与自己的对话」窗口？(y/N，其他人发来的消息将不触发 AI)：",
+        default="y",
+    )
+    cfg["SELF_CHAT_ONLY"] = cfg["WHATSAPP_ALLOW_FROM"].split(",")[0].strip() if self_chat.lower() == "y" else ""
+
     _write_config(cfg)
-    _write_compose_env(cfg["WHATSAPP_BRIDGE_SECRET"])
+    _write_compose_env(cfg["WHATSAPP_BRIDGE_SECRET"], cfg.get("SELF_CHAT_ONLY", ""))
 
     return cfg
 

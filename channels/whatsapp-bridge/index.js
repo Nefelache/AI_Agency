@@ -25,6 +25,8 @@ const AGENT_OS_API_KEY = process.env.AGENT_OS_API_KEY || "";
 
 const LOG_LEVEL = process.env.LOG_LEVEL || "silent";
 const HEARTBEAT_SECONDS = Number(process.env.HEARTBEAT_SECONDS || "30");
+// When set (e.g. +8613800138000), only process self-chat (message yourself). Ignores all other DMs.
+const SELF_CHAT_ONLY = process.env.SELF_CHAT_ONLY || "";
 
 const logger = pino({ level: LOG_LEVEL });
 
@@ -80,6 +82,13 @@ export function jidToPhone(jid) {
   return jid.replace(/@s\.whatsapp\.net/, "").replace(/@g\.us/, "");
 }
 
+function normalizePhoneForMatch(phone) {
+  const digits = String(phone).replace(/\D/g, "");
+  if (digits.length >= 10 && !digits.startsWith("1")) return "+" + digits;
+  if (digits.length === 10) return "+1" + digits;
+  return "+" + digits || phone;
+}
+
 async function startOnce() {
   const { state, saveCreds } = await useMultiFileAuthState("./auth");
 
@@ -119,15 +128,26 @@ async function startOnce() {
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     for (const msg of messages) {
-      if (msg.key.fromMe) continue;
       if (type !== "notify") continue;
-
-      const text = extractMessageText(msg);
-      if (!text) continue;
 
       const jid = msg.key.remoteJid;
       const isGroup = jid?.endsWith("@g.us");
       const from = msg.key.participant || jid;
+
+      if (SELF_CHAT_ONLY) {
+        const selfNorm = normalizePhoneForMatch(SELF_CHAT_ONLY);
+        const remoteNorm = normalizePhoneForMatch(jidToPhone(jid));
+        if (msg.key.fromMe) {
+          if (isGroup || remoteNorm !== selfNorm) continue;
+        } else {
+          continue;
+        }
+      } else {
+        if (msg.key.fromMe) continue;
+      }
+
+      const text = extractMessageText(msg);
+      if (!text) continue;
 
       const payload = {
         from_number: jidToPhone(from),
