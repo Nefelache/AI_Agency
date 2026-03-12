@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Agent OS — Neural Gateway",
-    version="0.2.0",
+    version="0.7.0",
     lifespan=lifespan,
 )
 
