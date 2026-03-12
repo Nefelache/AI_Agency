@@ -6,11 +6,13 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "login": "node index.js"
+    "login": "node index.js",
+    "test": "node --test test/unit.test.js",
+    "test:connection": "node scripts/connection-smoke.js"
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
-    "@whiskeysockets/baileys": "^6.7.8",
+    "@whiskeysockets/baileys": "6.7.21",
     "pino": "^9.0.0",
     "qrcode-terminal": "^0.12.0"
   }

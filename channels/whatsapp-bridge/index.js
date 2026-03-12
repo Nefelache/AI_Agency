@@ -63,7 +63,7 @@ async function heartbeat() {
   }
 }
 
-function extractMessageText(msg) {
+export function extractMessageText(msg) {
   const m = msg.message;
   if (!m) return "";
   return (
@@ -76,7 +76,7 @@ function extractMessageText(msg) {
   ).trim();
 }
 
-function jidToPhone(jid) {
+export function jidToPhone(jid) {
   return jid.replace(/@s\.whatsapp\.net/, "").replace(/@g\.us/, "");
 }
 
@@ -85,6 +85,7 @@ async function startOnce() {
 
   const sock = makeWASocket({
     auth: state,
+    version: [2, 3000, 1029620931],
     printQRInTerminal: false,
     logger,
   });

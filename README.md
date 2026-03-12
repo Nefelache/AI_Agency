@@ -47,6 +47,7 @@ python run.py
 
 # 5. Run tests
 pytest my_agent_os/tests/ -v
+cd channels/whatsapp-bridge && npm test
 ```
 
 ## Adding a New Skill
@@ -89,6 +90,14 @@ AGENT_OS_SECRET=your-random-secret \
 Scan the QR code with WhatsApp. Message the linked number — the agent replies.
 
 **Alternative auth**: Use `API_KEY_CHANNEL` as `X-API-Key` header instead of `AGENT_OS_SECRET`.
+
+### WhatsApp Bridge tests
+
+```bash
+cd channels/whatsapp-bridge
+npm test              # Unit tests (Baileys version, extractMessageText, jidToPhone)
+npm run test:connection  # Connection smoke test — verifies no 405 error (requires network)
+```
 
 ---
 

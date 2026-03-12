@@ -121,16 +121,8 @@ def main() -> None:
     choice = _prompt("是否现在启动 Docker 服务？(y/N)：", default="")
 
     if choice.lower() == "y":
-        # 若已安装 Docker，直接启动
-        if subprocess.run(["docker", "compose", "version"], capture_output=True).returncode == 0:
-            print("正在启动 agent-os + whatsapp-bridge...")
-            subprocess.run(
-                ["docker", "compose", "up", "-d", "--build", "agent-os", "whatsapp-bridge"],
-                cwd=ROOT,
-            )
-            print("\n已启动。扫码链接 WhatsApp：")
-            print("  docker compose logs -f whatsapp-bridge")
-        else:
+        # 检查 Docker CLI 是否安装
+        if subprocess.run(["docker", "compose", "version"], capture_output=True).returncode != 0:
             bootstrap = ROOT / "deploy" / "do" / "bootstrap.sh"
             if bootstrap.exists() and platform.system() == "Linux":
                 subprocess.run(["bash", str(bootstrap)], cwd=ROOT)
@@ -139,6 +131,27 @@ def main() -> None:
             else:
                 print("请先安装 Docker，然后执行：")
                 print("  docker compose up -d --build agent-os whatsapp-bridge")
+        else:
+            # 检查 Docker 守护进程是否在运行
+            daemon_ok = subprocess.run(
+                ["docker", "info"], capture_output=True, timeout=5
+            ).returncode == 0
+            if not daemon_ok:
+                print("\nDocker 已安装，但守护进程未运行。请先执行：")
+                print("  sudo systemctl start docker")
+                print("  sudo systemctl enable docker   # 开机自启")
+                print("\n然后重新运行：docker compose up -d --build agent-os whatsapp-bridge")
+            else:
+                print("正在启动 agent-os + whatsapp-bridge...")
+                ret = subprocess.run(
+                    ["docker", "compose", "up", "-d", "--build", "agent-os", "whatsapp-bridge"],
+                    cwd=ROOT,
+                )
+                if ret.returncode == 0:
+                    print("\n已启动。扫码链接 WhatsApp：")
+                    print("  docker compose logs -f whatsapp-bridge")
+                else:
+                    print("\n启动失败，请检查上方错误信息。")
         return
 
     print("下一步：")
