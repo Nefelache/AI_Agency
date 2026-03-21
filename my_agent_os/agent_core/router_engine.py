@@ -27,6 +27,7 @@ _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 _memory_engine = None
 _crew_orchestrator = None
+_PROMPTS_CACHE: dict | None = None
 
 CREW_COMPLEXITY_THRESHOLD = 0.5
 
@@ -42,8 +43,11 @@ def set_crew_orchestrator(orchestrator) -> None:
 
 
 def _load_prompts(filename: str = "system_prompts.yaml") -> dict:
-    with open(_PROMPTS_DIR / filename, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    global _PROMPTS_CACHE
+    if _PROMPTS_CACHE is None:
+        with open(_PROMPTS_DIR / filename, "r", encoding="utf-8") as f:
+            _PROMPTS_CACHE = yaml.safe_load(f)
+    return _PROMPTS_CACHE
 
 
 def _build_system_message(prompts: dict, channel: str) -> str:
@@ -68,7 +72,9 @@ async def route(
     force_crew: bool = False,
 ) -> dict[str, Any]:
     start_ts = time.perf_counter()
-    session_id = f"{channel}:{user_id}"
+    # user_id already carries the channel prefix (e.g. "whatsapp:+86xxx")
+    # Use it directly as session_id to avoid double-prefix in audit logs.
+    session_id = user_id
 
     prompts = _load_prompts()
     system_msg = _build_system_message(prompts, channel)
@@ -91,7 +97,7 @@ async def route(
         f"\n[User Preferences]\n{json.dumps(preferences, ensure_ascii=False)}"
     )
 
-    # Complexity routing: crew or single agent
+    # Complexity routing: crew (console only) or single agent
     if _crew_orchestrator and channel == "console":
         if force_crew:
             return await _route_via_crew(raw_input, user_id, system_msg, user_payload_parts, channel, start_ts)
@@ -99,7 +105,7 @@ async def route(
         if complexity >= CREW_COMPLEXITY_THRESHOLD:
             return await _route_via_crew(raw_input, user_id, system_msg, user_payload_parts, channel, start_ts)
 
-    # Single-agent path
+    # Single-agent path (whatsapp, mobile, console fallback)
     raw_response = await call_llm(
         system_message=system_msg,
         user_message="\n".join(user_payload_parts),

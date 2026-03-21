@@ -1,12 +1,26 @@
 # Channel Configuration — OpenClaw-style policies
 # DM/Group access control, pairing, allowlists
+#
+# Quick setup guide:
+#   - SELF_CHAT_ONLY mode (owner chats with themselves only):
+#       Set SELF_CHAT_ONLY=+86xxx in root .env
+#       Set WHATSAPP_ALLOW_FROM=+86xxx in my_agent_os/config/.env
+#       dm_policy can stay "open" — SELF_CHAT_ONLY filters at bridge level
+#
+#   - Allowlist mode (specific numbers only):
+#       Set dm_policy: "allowlist"
+#       Add numbers to allow_from or WHATSAPP_ALLOW_FROM env
+#
+#   - Open mode (anyone can message):
+#       Set dm_policy: "open"
 
 whatsapp:
   enabled: true
-  # DM policy: pairing | allowlist | open | disabled
-  dm_policy: "allowlist"
-  # E.164 phone numbers allowed for DM (empty = use allowFrom from env)
-  allow_from: []  # e.g. ["+15551234567"]
+  # DM policy: open | allowlist | pairing | disabled
+  # "open" allows everyone; "allowlist" restricts to allow_from list
+  dm_policy: "open"
+  # E.164 phone numbers for allowlist policy (overridden by WHATSAPP_ALLOW_FROM env)
+  allow_from: []  # e.g. ["+15551234567", "+8613800138000"]
   # Group policy: allowlist | open | disabled
   group_policy: "allowlist"
   group_allow_from: []

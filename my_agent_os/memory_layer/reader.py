@@ -54,9 +54,8 @@ class MemoryReader:
         self._top_k = top_k
         self._decay_days = decay_days
         self._max_chars = max_injection_chars
-        self._prompts = yaml.safe_load(
-            open(_PROMPTS_PATH, "r", encoding="utf-8").read()
-        )
+        with open(_PROMPTS_PATH, "r", encoding="utf-8") as _f:
+            self._prompts = yaml.safe_load(_f)
 
     # ── Public API ───────────────────────────────────────
 
@@ -140,7 +139,7 @@ class MemoryReader:
                         record=record,
                         relevance_score=similarity,
                         query_relevance=similarity,
-                        source="vector",
+                        source="fts",  # full-text search (not vector)
                     )
 
         now = utcnow()
@@ -161,7 +160,7 @@ class MemoryReader:
 
         decision_boost = 0.15 if r.key_points else 0.0
 
-        source_boost = 0.2 if rm.source == "both" else (0.1 if rm.source == "hash" else 0.0)
+        source_boost = 0.2 if rm.source == "both" else (0.1 if rm.source == "hash" else 0.0)  # fts=0
 
         base_relevance = rm.relevance_score
 

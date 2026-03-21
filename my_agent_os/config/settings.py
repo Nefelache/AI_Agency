@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     # --- WhatsApp ---
     WHATSAPP_BRIDGE_SECRET: str = ""  # Shared secret for Baileys bridge
     WHATSAPP_ALLOW_FROM: str = ""  # Comma-separated E.164 numbers (e.g. +15551234567,+8613800138000)
+    # When set, only process messages from the self-chat window (owner messages themselves).
+    # The bridge filters on this; agent-os also auto-adds this number to the allowlist.
+    SELF_CHAT_ONLY: str = ""
     # Cloud API (PyWa) — optional, for Meta Business
     WHATSAPP_PHONE_ID: str = ""
     WHATSAPP_ACCESS_TOKEN: str = ""

@@ -79,7 +79,9 @@ async def _call_deepseek(
         payload["response_format"] = {"type": "json_object"}
 
     proxy = settings.HTTPS_PROXY or None
-    async with httpx.AsyncClient(timeout=60, proxy=proxy) as client:
+    # connect_timeout=10s, read_timeout=60s — avoids hanging on slow networks
+    timeout = httpx.Timeout(connect=10.0, read=60.0, write=10.0, pool=5.0)
+    async with httpx.AsyncClient(timeout=timeout, proxy=proxy) as client:
         resp = await client.post(url, json=payload, headers=headers)
         if resp.status_code != 200:
             body = resp.text
