@@ -1,7 +1,11 @@
+# osliceinspiration.com → company website
 {$DOMAIN} {
   encode gzip
-
-  # Reverse proxy to Agent OS
-  reverse_proxy agent-os:8000
+  reverse_proxy company-website:4000
 }
 
+# agent.osliceinspiration.com → AI Agent terminal
+{$AGENT_DOMAIN} {
+  encode gzip
+  reverse_proxy agent-os:8000
+}

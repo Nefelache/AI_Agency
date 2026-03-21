@@ -42,6 +42,7 @@ services:
       - "443:443"
     environment:
       - DOMAIN=${DOMAIN}
+      - AGENT_DOMAIN=${AGENT_DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
