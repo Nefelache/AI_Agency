@@ -1,0 +1,326 @@
+{
+  "A_no_memory": {
+    "accuracy_pct": 0.0,
+    "avg_context_chars": 54,
+    "avg_injected_chars": null,
+    "correct": 0,
+    "total": 10,
+    "rows": [
+      {
+        "fact_id": "name",
+        "question": "What is my full name?",
+        "expected": "Alex",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.1,
+        "context_chars": 49
+      },
+      {
+        "fact_id": "age",
+        "question": "How old am I?",
+        "expected": "30",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 41
+      },
+      {
+        "fact_id": "city",
+        "question": "What city do I live in?",
+        "expected": "Los Angeles",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 51
+      },
+      {
+        "fact_id": "company",
+        "question": "What is my company name?",
+        "expected": "OsliceInspiration",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 52
+      },
+      {
+        "fact_id": "funding",
+        "question": "How much funding did we raise?",
+        "expected": "2 million",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 58
+      },
+      {
+        "fact_id": "partner",
+        "question": "What is my co-founder's name?",
+        "expected": "Mike",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 57
+      },
+      {
+        "fact_id": "allergy",
+        "question": "What am I allergic to?",
+        "expected": "alcohol",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 50
+      },
+      {
+        "fact_id": "music",
+        "question": "What music genres should I avoid?",
+        "expected": "Rap",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 61
+      },
+      {
+        "fact_id": "diet",
+        "question": "What is my dietary restriction?",
+        "expected": "low sugar",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 59
+      },
+      {
+        "fact_id": "goal",
+        "question": "What is the 2026 business goal?",
+        "expected": "500K",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 59
+      }
+    ]
+  },
+  "B_full_history": {
+    "accuracy_pct": 100.0,
+    "avg_context_chars": 507,
+    "avg_injected_chars": null,
+    "correct": 10,
+    "total": 10,
+    "rows": [
+      {
+        "fact_id": "name",
+        "question": "What is my full name?",
+        "expected": "Alex",
+        "response": "Based on your profile: Alex.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 502
+      },
+      {
+        "fact_id": "age",
+        "question": "How old am I?",
+        "expected": "30",
+        "response": "Based on your profile: 30.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 494
+      },
+      {
+        "fact_id": "city",
+        "question": "What city do I live in?",
+        "expected": "Los Angeles",
+        "response": "Based on your profile: Los Angeles.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 504
+      },
+      {
+        "fact_id": "company",
+        "question": "What is my company name?",
+        "expected": "OsliceInspiration",
+        "response": "Based on your profile: OsliceInspiration.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 505
+      },
+      {
+        "fact_id": "funding",
+        "question": "How much funding did we raise?",
+        "expected": "2 million",
+        "response": "Based on your profile: 2 million.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 511
+      },
+      {
+        "fact_id": "partner",
+        "question": "What is my co-founder's name?",
+        "expected": "Mike",
+        "response": "Based on your profile: Mike.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 510
+      },
+      {
+        "fact_id": "allergy",
+        "question": "What am I allergic to?",
+        "expected": "alcohol",
+        "response": "Based on your profile: alcohol.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 503
+      },
+      {
+        "fact_id": "music",
+        "question": "What music genres should I avoid?",
+        "expected": "Rap",
+        "response": "Based on your profile: Rap.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 514
+      },
+      {
+        "fact_id": "diet",
+        "question": "What is my dietary restriction?",
+        "expected": "low sugar",
+        "response": "Based on your profile: low sugar.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 512
+      },
+      {
+        "fact_id": "goal",
+        "question": "What is the 2026 business goal?",
+        "expected": "500K",
+        "response": "Based on your profile: 500K.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 512
+      }
+    ]
+  },
+  "C_pyramid": {
+    "accuracy_pct": 50.0,
+    "avg_context_chars": 178,
+    "avg_injected_chars": 104,
+    "correct": 5,
+    "total": 10,
+    "rows": [
+      {
+        "fact_id": "name",
+        "question": "What is my full name?",
+        "expected": "Alex",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 221,
+        "injected_chars": 151,
+        "memories_retrieved": 3
+      },
+      {
+        "fact_id": "age",
+        "question": "How old am I?",
+        "expected": "30",
+        "response": "Based on your profile: 30.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 95,
+        "injected_chars": 33,
+        "memories_retrieved": 1
+      },
+      {
+        "fact_id": "city",
+        "question": "What city do I live in?",
+        "expected": "Los Angeles",
+        "response": "Based on your profile: Los Angeles.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 120,
+        "injected_chars": 48,
+        "memories_retrieved": 1
+      },
+      {
+        "fact_id": "company",
+        "question": "What is my company name?",
+        "expected": "OsliceInspiration",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 224,
+        "injected_chars": 151,
+        "memories_retrieved": 3
+      },
+      {
+        "fact_id": "funding",
+        "question": "How much funding did we raise?",
+        "expected": "2 million",
+        "response": "Based on your profile: 2 million.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 136,
+        "injected_chars": 57,
+        "memories_retrieved": 1
+      },
+      {
+        "fact_id": "partner",
+        "question": "What is my co-founder's name?",
+        "expected": "Mike",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 254,
+        "injected_chars": 176,
+        "memories_retrieved": 3
+      },
+      {
+        "fact_id": "allergy",
+        "question": "What am I allergic to?",
+        "expected": "alcohol",
+        "response": "Based on your profile: alcohol.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 140,
+        "injected_chars": 69,
+        "memories_retrieved": 1
+      },
+      {
+        "fact_id": "music",
+        "question": "What music genres should I avoid?",
+        "expected": "Rap",
+        "response": "Based on your profile: Rap.",
+        "correct": true,
+        "ms": 0.0,
+        "context_chars": 131,
+        "injected_chars": 49,
+        "memories_retrieved": 1
+      },
+      {
+        "fact_id": "diet",
+        "question": "What is my dietary restriction?",
+        "expected": "low sugar",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 231,
+        "injected_chars": 151,
+        "memories_retrieved": 3
+      },
+      {
+        "fact_id": "goal",
+        "question": "What is the 2026 business goal?",
+        "expected": "500K",
+        "response": "I don't have that information in my current context.",
+        "correct": false,
+        "ms": 0.0,
+        "context_chars": 231,
+        "injected_chars": 151,
+        "memories_retrieved": 3
+      }
+    ]
+  },
+  "summary_efficiency": {
+    "total_facts": 10,
+    "full_history_chars": 407,
+    "pyramid_chars": 84,
+    "token_savings_pct": 79.4,
+    "memories_retrieved": 1
+  }
+}

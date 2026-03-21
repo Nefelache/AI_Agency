@@ -1,0 +1,124 @@
+{
+  "hash_vs_scan_n50": {
+    "n_memories": 50,
+    "hash_avg_ms": 0.089,
+    "scan_avg_ms": 0.518,
+    "speedup_x": 5.82
+  },
+  "hash_vs_scan_n200": {
+    "n_memories": 200,
+    "hash_avg_ms": 0.136,
+    "scan_avg_ms": 1.763,
+    "speedup_x": 12.94
+  },
+  "hash_vs_scan_n500": {
+    "n_memories": 500,
+    "hash_avg_ms": 0.19,
+    "scan_avg_ms": 4.66,
+    "speedup_x": 24.5
+  },
+  "fts_vs_naive_n50": {
+    "n_memories": 50,
+    "fts_avg_ms": 0.572,
+    "naive_avg_ms": 0.512,
+    "speedup_x": 0.9
+  },
+  "fts_vs_naive_n200": {
+    "n_memories": 200,
+    "fts_avg_ms": 7.571,
+    "naive_avg_ms": 1.976,
+    "speedup_x": 0.26
+  },
+  "fts_vs_naive_n500": {
+    "n_memories": 500,
+    "fts_avg_ms": 8.344,
+    "naive_avg_ms": 4.196,
+    "speedup_x": 0.5
+  },
+  "token_efficiency_budget800": {
+    "total_memories": 20,
+    "budget_chars": 800,
+    "naive_chars": 706,
+    "naive_tokens_est": 176,
+    "pyramid_chars": 272,
+    "pyramid_tokens_est": 47,
+    "memories_injected": 3,
+    "token_savings_pct": 61.5
+  },
+  "token_efficiency_budget1200": {
+    "total_memories": 20,
+    "budget_chars": 1200,
+    "naive_chars": 706,
+    "naive_tokens_est": 176,
+    "pyramid_chars": 272,
+    "pyramid_tokens_est": 47,
+    "memories_injected": 3,
+    "token_savings_pct": 61.5
+  },
+  "token_efficiency_budget2000": {
+    "total_memories": 20,
+    "budget_chars": 2000,
+    "naive_chars": 706,
+    "naive_tokens_est": 176,
+    "pyramid_chars": 272,
+    "pyramid_tokens_est": 47,
+    "memories_injected": 3,
+    "token_savings_pct": 61.5
+  },
+  "priority_score_table": [
+    {
+      "scenario": "New, high-relevance, both-sources",
+      "score": 0.6508
+    },
+    {
+      "scenario": "New, high-relevance, FTS-only",
+      "score": 0.595
+    },
+    {
+      "scenario": "1-week-old, medium relevance",
+      "score": 0.325
+    },
+    {
+      "scenario": "2-week-old, low relevance",
+      "score": 0.16
+    },
+    {
+      "scenario": "Old but frequently accessed",
+      "score": 0.1594
+    },
+    {
+      "scenario": "Recent, no relevance",
+      "score": 0.325
+    }
+  ],
+  "scaling_n10": {
+    "n_memories": 10,
+    "avg_ms": 2.81,
+    "p95_ms": 3.33,
+    "p99_ms": 3.33
+  },
+  "scaling_n50": {
+    "n_memories": 50,
+    "avg_ms": 4.2,
+    "p95_ms": 5.36,
+    "p99_ms": 5.36
+  },
+  "scaling_n100": {
+    "n_memories": 100,
+    "avg_ms": 6.39,
+    "p95_ms": 8.7,
+    "p99_ms": 8.7
+  },
+  "scaling_n250": {
+    "n_memories": 250,
+    "avg_ms": 14.25,
+    "p95_ms": 19.77,
+    "p99_ms": 19.77
+  },
+  "scaling_n500": {
+    "n_memories": 500,
+    "avg_ms": 30.08,
+    "p95_ms": 42.98,
+    "p99_ms": 42.98
+  }
+}
