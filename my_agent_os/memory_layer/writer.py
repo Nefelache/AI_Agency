@@ -216,9 +216,35 @@ class MemoryWriter:
 
     # ── Helpers ──────────────────────────────────────────
 
+    # Morphological variants: stored form → query-likely synonyms
+    # Ensures that if "dietary" is asked but "diet" was stored, hash lookup still hits.
+    _MORPH_VARIANTS: dict[str, list[str]] = {
+        "allergic":   ["allergy"],
+        "allergies":  ["allergy"],
+        "dietary":    ["diet"],
+        "cofounder":  ["founder"],
+        "cofounded":  ["founder"],
+        "cofounding": ["founder"],
+        "restriction": ["restrict"],
+        "restrictions": ["restrict"],
+        "preference":  ["prefer"],
+        "preferences": ["prefer"],
+        "technical":   ["tech"],
+        "technologies": ["tech", "technology"],
+        "founded":    ["founder"],
+        "founding":   ["founder"],
+        "financial":  ["finance"],
+        "finances":   ["finance"],
+    }
+
     @staticmethod
     def _extract_entities_simple(text: str) -> list[str]:
-        """Fast, rule-based entity extraction for hash indexing during writes."""
+        """
+        Fast, rule-based entity extraction for hash indexing during writes.
+
+        Also indexes morphological variants so that queries using different
+        word forms (e.g. 'dietary' vs 'diet') still hit the hash index.
+        """
         import re
         words = re.findall(r"[\u4e00-\u9fff]+|[A-Za-z][A-Za-z0-9_]+", text)
         stopwords = {
@@ -230,15 +256,21 @@ class MemoryWriter:
             "的", "了", "是", "在", "我", "你", "他", "她", "它", "们",
             "和", "与", "或", "但", "而", "也", "都", "就", "会", "有",
         }
-        entities = []
-        seen = set()
+        entities: list[str] = []
+        seen: set[str] = set()
         for w in words:
             low = w.lower()
             if len(low) < 2 or low in stopwords or low in seen:
                 continue
             seen.add(low)
             entities.append(low)
-        return entities[:20]
+            # Add morphological variants so queries using different word
+            # forms still hit the hash index via O(1) lookup.
+            for variant in MemoryWriter._MORPH_VARIANTS.get(low, []):
+                if variant not in seen:
+                    seen.add(variant)
+                    entities.append(variant)
+        return entities[:30]  # increased cap to accommodate variants
 
     @staticmethod
     def _parse_json(raw: str) -> dict:

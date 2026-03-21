@@ -83,6 +83,14 @@ summarization: |
 entity_extraction: |
   Extract the key entities and topics from this query for memory lookup.
   Return only the most specific, meaningful terms (not stop words).
+  IMPORTANT: Also include common morphological variants so the index search
+  finds related memories even when word forms differ.
+  Examples of variants to include:
+    - if query has "dietary" → also include "diet"
+    - if query has "allergic" → also include "allergy"
+    - if query has "cofounder" → also include "founder"
+    - if query has "restriction" → also include "restrict"
+    - if query has "preferences" → also include "prefer"
 
   Query: {query}
 

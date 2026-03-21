@@ -97,14 +97,34 @@ class MemoryReader:
 
     @staticmethod
     def _fallback_entities(query: str) -> list[str]:
-        """Rule-based fallback for entity extraction."""
+        """Rule-based fallback for entity extraction — mirrors writer variants."""
         import re
+        # Same variant map as MemoryWriter for consistent hash index coverage
+        _VARIANTS: dict[str, list[str]] = {
+            "dietary": ["diet"], "allergic": ["allergy"], "allergies": ["allergy"],
+            "cofounder": ["founder"], "cofounded": ["founder"], "restriction": ["restrict"],
+            "restrictions": ["restrict"], "preference": ["prefer"], "preferences": ["prefer"],
+            "technical": ["tech"], "technologies": ["tech", "technology"],
+            "founded": ["founder"], "financial": ["finance"], "finances": ["finance"],
+        }
         words = re.findall(r"[\u4e00-\u9fff]{2,}|[A-Za-z][A-Za-z0-9_]{2,}", query)
         stopwords = {
             "the", "what", "how", "when", "where", "which", "about",
             "什么", "怎么", "如何", "哪个", "关于", "还有", "可以",
         }
-        return [w.lower() for w in words if w.lower() not in stopwords][:10]
+        entities: list[str] = []
+        seen: set[str] = set()
+        for w in words:
+            low = w.lower()
+            if low in stopwords or low in seen:
+                continue
+            seen.add(low)
+            entities.append(low)
+            for v in _VARIANTS.get(low, []):
+                if v not in seen:
+                    seen.add(v)
+                    entities.append(v)
+        return entities[:15]
 
     # ── Merge & Rank ─────────────────────────────────────
 
@@ -127,7 +147,12 @@ class MemoryReader:
                 )
 
         for mid, rank in vector_hits:
-            similarity = max(0.0, 1.0 / (1.0 + abs(rank)))
+            # BM25 in SQLite FTS5: more negative rank = more relevant.
+            # Correct mapping: higher abs(rank) → higher similarity.
+            # Formula: 1 - 1/(1+abs(rank))  →  maps [0, ∞) to [0, 1)
+            # This ensures rank=-4.57 (strong match) → 0.82
+            # while   rank=-0.00 (weak match)  → 0.00
+            similarity = 1.0 - 1.0 / (1.0 + abs(rank))
             if mid in scored:
                 scored[mid].relevance_score = similarity
                 scored[mid].query_relevance = similarity

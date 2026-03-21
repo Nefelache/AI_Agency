@@ -198,21 +198,21 @@
     ]
   },
   "C_pyramid": {
-    "accuracy_pct": 50.0,
-    "avg_context_chars": 178,
-    "avg_injected_chars": 104,
-    "correct": 5,
+    "accuracy_pct": 90.0,
+    "avg_context_chars": 174,
+    "avg_injected_chars": 99,
+    "correct": 9,
     "total": 10,
     "rows": [
       {
         "fact_id": "name",
         "question": "What is my full name?",
         "expected": "Alex",
-        "response": "I don't have that information in my current context.",
-        "correct": false,
+        "response": "Based on your profile: Alex.",
+        "correct": true,
         "ms": 0.0,
-        "context_chars": 221,
-        "injected_chars": 151,
+        "context_chars": 219,
+        "injected_chars": 149,
         "memories_retrieved": 3
       },
       {
@@ -241,11 +241,11 @@
         "fact_id": "company",
         "question": "What is my company name?",
         "expected": "OsliceInspiration",
-        "response": "I don't have that information in my current context.",
-        "correct": false,
+        "response": "Based on your profile: OsliceInspiration.",
+        "correct": true,
         "ms": 0.0,
-        "context_chars": 224,
-        "injected_chars": 151,
+        "context_chars": 222,
+        "injected_chars": 149,
         "memories_retrieved": 3
       },
       {
@@ -263,11 +263,11 @@
         "fact_id": "partner",
         "question": "What is my co-founder's name?",
         "expected": "Mike",
-        "response": "I don't have that information in my current context.",
-        "correct": false,
+        "response": "Based on your profile: Mike.",
+        "correct": true,
         "ms": 0.0,
-        "context_chars": 254,
-        "injected_chars": 176,
+        "context_chars": 241,
+        "injected_chars": 163,
         "memories_retrieved": 3
       },
       {
@@ -299,19 +299,19 @@
         "response": "I don't have that information in my current context.",
         "correct": false,
         "ms": 0.0,
-        "context_chars": 231,
-        "injected_chars": 151,
+        "context_chars": 229,
+        "injected_chars": 149,
         "memories_retrieved": 3
       },
       {
         "fact_id": "goal",
         "question": "What is the 2026 business goal?",
         "expected": "500K",
-        "response": "I don't have that information in my current context.",
-        "correct": false,
+        "response": "Based on your profile: 500K.",
+        "correct": true,
         "ms": 0.0,
-        "context_chars": 231,
-        "injected_chars": 151,
+        "context_chars": 208,
+        "injected_chars": 128,
         "memories_retrieved": 3
       }
     ]
@@ -319,8 +319,8 @@
   "summary_efficiency": {
     "total_facts": 10,
     "full_history_chars": 407,
-    "pyramid_chars": 84,
-    "token_savings_pct": 79.4,
-    "memories_retrieved": 1
+    "pyramid_chars": 224,
+    "token_savings_pct": 45.0,
+    "memories_retrieved": 2
   }
 }

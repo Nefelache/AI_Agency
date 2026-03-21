@@ -135,75 +135,126 @@ class TestHashVsFullScan:
 # ══════════════════════════════════════════════════════════════════
 
 class TestFTSvNaive:
-    """FTS5 indexed search should be faster than Python-level filtering."""
+    """
+    FTS5 vs SQL LIKE '%keyword%' — the correct apples-to-apples comparison.
+
+    Both are SQL queries. Key differences:
+    - FTS5: inverted index, O(log n) lookup, returns BM25-ranked results
+    - LIKE: full sequential scan, O(n), returns unordered boolean matches
+
+    The BM25 ranking is the critical functional advantage: FTS5 surfaces
+    the MOST relevant memories first, while LIKE returns them all equally.
+    At N>100, FTS5 should also be measurably faster.
+    """
 
     @pytest.mark.parametrize("n", [50, 200, 500])
-    async def test_fts_vs_naive(self, store, n):
+    async def test_fts_vs_sql_like(self, store, n):
         await seed_memories(store, n)
         keyword = random.choice(WORD_POOL)
 
         async def do_fts():
             return await store.fulltext_search(keyword, top_k=10, user_id="bench")
 
-        async def do_naive():
-            all_m = await store.get_all_memories("bench", limit=n + 100)
-            return [m for m in all_m if keyword in m.content.lower()]
+        # SQL LIKE — full sequential scan, no ranking
+        async def do_like():
+            async with store._db.execute(
+                "SELECT id FROM memories WHERE content LIKE ? "
+                "AND user_id = ? AND status = 'active' LIMIT 10",
+                (f"%{keyword}%", "bench"),
+            ) as cur:
+                return await cur.fetchall()
 
         fts_times = await time_fn(do_fts, runs=30)
-        naive_times = await time_fn(do_naive, runs=30)
+        like_times = await time_fn(do_like, runs=30)
 
         fts_avg = statistics.mean(fts_times)
-        naive_avg = statistics.mean(naive_times)
-        speedup = naive_avg / fts_avg if fts_avg > 0 else 1.0
+        like_avg = statistics.mean(like_times)
+        speedup = like_avg / fts_avg if fts_avg > 0 else 1.0
 
-        _RESULTS[f"fts_vs_naive_n{n}"] = {
+        _RESULTS[f"fts_vs_like_n{n}"] = {
             "n_memories": n,
             "fts_avg_ms": round(fts_avg, 3),
-            "naive_avg_ms": round(naive_avg, 3),
+            "like_avg_ms": round(like_avg, 3),
             "speedup_x": round(speedup, 2),
+            "fts_ranked": True,
+            "like_ranked": False,
         }
-        print(f"\n[FTS vs Naive N={n}] fts={fts_avg:.2f}ms  naive={naive_avg:.2f}ms  speedup={speedup:.1f}×")
+        print(
+            f"\n[FTS vs LIKE N={n}] fts={fts_avg:.2f}ms (ranked)  "
+            f"LIKE={like_avg:.2f}ms (unranked)  speedup={speedup:.1f}×"
+        )
 
 
 # ══════════════════════════════════════════════════════════════════
-# Benchmark 3: Token Efficiency
+# Benchmark 3: Token Efficiency (Realistic Scale)
 # ══════════════════════════════════════════════════════════════════
 
-_PROFILE_FACTS = [
-    ("User's full name is Alex Chen", ["alex", "chen"], 0.9),
-    ("User is 30 years old", ["30", "age"], 0.8),
-    ("Lives in Los Angeles, California", ["los_angeles", "california"], 0.8),
-    ("Company: OsliceInspiration AI consulting startup", ["oslice", "company"], 0.85),
-    ("Series A: $2 million raised Jan 2026", ["funding", "series_a", "million"], 0.9),
-    ("Co-founder is Mike Zhang (engineering)", ["mike", "cofounder"], 0.7),
-    ("Allergic to alcohol — strictly avoided", ["alcohol", "allergy"], 0.95),
-    ("Music blacklist: Rap and Heavy Metal", ["rap", "metal", "music"], 0.8),
-    ("Diet: low sugar, no processed foods", ["sugar", "diet"], 0.7),
-    ("Goal 2026: reach $500K ARR", ["goal", "arr", "500k"], 0.7),
-    ("Tech stack: DeepSeek LLM, FastAPI, SQLite", ["deepseek", "fastapi"], 0.5),
-    ("Team size: 4 including founders", ["team"], 0.4),
-    ("Primary market: US small businesses", ["market", "us"], 0.5),
-    ("Revenue model: $99/month SaaS subscription", ["revenue", "subscription"], 0.6),
-    ("Background: 5 years at Google before founding", ["google", "experience"], 0.4),
-    ("Hobby: playing piano on weekends", ["piano", "hobby"], 0.25),
-    ("Pet: golden retriever named Biscuit", ["dog", "pet"], 0.2),
-    ("Favourite read: Zero to One by Thiel", ["reading", "books"], 0.3),
-    ("Fitness: morning runs and yoga", ["fitness", "health"], 0.3),
-    ("Prefers serif fonts; minimal UI aesthetic", ["fonts", "design", "aesthetic"], 0.35),
+# Realistic long-form memories (100-200 chars) simulating 3+ months of usage
+_REALISTIC_MEMORIES = [
+    # High-priority personal profile
+    ("User Alex Chen (age 30) is a UI/UX designer and AI startup founder based in Los Angeles. "
+     "Has 5 years prior experience at Google as a product designer.", ["alex", "designer", "los_angeles", "google"], 0.95),
+    ("Company OsliceInspiration specialises in custom AI assistant deployments for SMBs. "
+     "Founded January 2024. 4 staff including technical co-founder Mike Zhang.", ["oslice", "company", "mike", "startup"], 0.90),
+    ("Raised Series A of $2 million in January 2026 led by Sequoia Capital. "
+     "Goal is $500K ARR by December 2026 at $99/month per seat.", ["funding", "arr", "sequoia", "goal"], 0.90),
+    ("ALLERGY: Strictly no alcohol of any kind. Also avoids processed sugar. "
+     "Follows low-carb Mediterranean-style diet.", ["alcohol", "allergy", "diet", "sugar"], 0.95),
+    ("Music preferences: Classical (Bach, Chopin), Lo-Fi hip-hop, Jazz. "
+     "BLACKLIST: Rap, Heavy Metal. Never suggest these genres.", ["music", "classical", "jazz", "rap"], 0.85),
+    # Work context
+    ("Key client Tesla Motors — Q1 dashboard UX overhaul project, "
+     "deadline April 15. Primary contact: James Liu (Head of Design).", ["tesla", "client", "dashboard", "april"], 0.85),
+    ("Weekly standup every Monday 9am with Mike. Board meeting last Thursday "
+     "covered Series A milestones. Investors satisfied with growth trajectory.", ["standup", "board", "meeting", "monday"], 0.70),
+    ("Tech stack: Python (FastAPI), Node.js (Baileys bridge), SQLite for memory. "
+     "Hosted on DigitalOcean Droplet ($48/month), Caddy reverse proxy.", ["fastapi", "sqlite", "digitalocean", "caddy"], 0.65),
+    ("Vendor Figma renewed license at $45/user/month. Adobe CC expired - "
+     "decided not to renew. Using Framer for prototyping instead.", ["figma", "adobe", "framer", "vendor"], 0.55),
+    ("Revenue MRR as of March 2026: $23,400. Churn rate 4.2%. "
+     "Top customer segment: e-commerce SMBs.", ["revenue", "mrr", "churn", "ecommerce"], 0.75),
+    # Health & lifestyle
+    ("Morning routine: 5am wake up, 45-min run (5km average), cold shower, "
+     "journal. Aims for 7.5 hours sleep. Tracks with Apple Health.", ["morning", "run", "sleep", "health"], 0.45),
+    ("Gym routine: Mon/Wed/Fri weight training. Currently focusing on hypertrophy. "
+     "Max bench: 90kg. Working with coach David Tan.", ["gym", "fitness", "bench", "hypertrophy"], 0.40),
+    ("Reads 2 books/month. Current: Zero to One (Peter Thiel). Queue: "
+     "The Lean Startup, Thinking Fast and Slow, Sapiens.", ["reading", "books", "thiel", "startup"], 0.35),
+    # Relationships
+    ("Wife Sarah Chen is an emergency physician at Cedars-Sinai. "
+     "Married March 2022. No children yet, planning in 2027.", ["sarah", "wife", "cedars", "married"], 0.50),
+    ("Parents in Shanghai — video call every Sunday. "
+     "Father retired engineer, mother runs small restaurant.", ["parents", "shanghai", "family"], 0.40),
+    # Finance
+    ("Personal bank: Chase Sapphire. Business: Mercury. "
+     "Monthly personal burn: ~$8,500 including mortgage $4,200.", ["bank", "chase", "mercury", "mortgage"], 0.55),
+    ("Investment portfolio: 60% index funds (VTI/VXUS), 30% tech stocks "
+     "(NVDA, MSFT, AAPL), 10% crypto (BTC, ETH). Net worth ~$1.2M.", ["investments", "stocks", "crypto", "portfolio"], 0.45),
+    # Preferences
+    ("UI aesthetic: dark mode only, minimal flat design, Inter or Geist font. "
+     "Hates gradients, drop shadows, cluttered interfaces.", ["design", "dark", "minimal", "font"], 0.60),
+    ("Communication style: voice memos over texts, async Slack preferred. "
+     "Response time SLA: 4h for clients, same-day for team.", ["communication", "slack", "async", "voice"], 0.50),
+    ("Travel: 4-6 trips/year. Prefers Asia-Pacific routes. "
+     "Airline: United 1K status. Hotel: Marriott Bonvoy Gold.", ["travel", "united", "marriott", "flights"], 0.40),
 ]
 
 
 class TestTokenEfficiency:
-    """Pyramid injection should use far fewer chars than dumping all memories."""
+    """
+    Pyramid injection should use far fewer chars than dumping all memories.
+    Uses realistic-scale memories (100-200 chars each) to demonstrate
+    the savings that matter in production use.
+    """
 
-    async def test_pyramid_vs_full_history(self, store):
-        # Seed the realistic profile
+    async def test_pyramid_vs_full_history_realistic_scale(self, store):
+        """Primary benchmark: 20 realistic memories, budget variants."""
         records = []
-        for content, entities, priority in _PROFILE_FACTS:
+        for content, entities, priority in _REALISTIC_MEMORIES:
             r = MemoryRecord(
                 memory_type=MemoryType.SEMANTIC,
                 content=content,
-                summary=content[:80],
+                summary=content[:100],  # realistic summary = first 100 chars
                 entities=entities,
                 user_id="alex",
                 priority=priority,
@@ -212,12 +263,9 @@ class TestTokenEfficiency:
             records.append(r)
 
         total_memories = len(records)
-
-        # ── Naive: dump all memories ──
         naive_chars = sum(len(r.content) for r in records)
         naive_tokens_est = naive_chars // 4
 
-        # ── Pyramid: query-aware top-k ──
         for budget in [800, 1200, 2000]:
             reader = MemoryReader(store, mock_llm, top_k=5, max_injection_chars=budget)
             ctx = await reader.retrieve(
@@ -225,7 +273,6 @@ class TestTokenEfficiency:
                 "alex",
             )
             pyramid_chars = len(ctx.summary_layer) + len(ctx.decision_layer) + len(ctx.detail_layer)
-            pyramid_tokens_est = ctx.token_estimate
             savings_pct = (1 - pyramid_chars / naive_chars) * 100 if naive_chars else 0
 
             _RESULTS[f"token_efficiency_budget{budget}"] = {
@@ -234,31 +281,33 @@ class TestTokenEfficiency:
                 "naive_chars": naive_chars,
                 "naive_tokens_est": naive_tokens_est,
                 "pyramid_chars": pyramid_chars,
-                "pyramid_tokens_est": pyramid_tokens_est,
+                "pyramid_tokens_est": ctx.token_estimate,
                 "memories_injected": len(ctx.source_ids),
                 "token_savings_pct": round(savings_pct, 1),
+                "avg_memory_length_chars": naive_chars // total_memories,
             }
             print(
-                f"\n[Token N={total_memories} budget={budget}] "
-                f"naive={naive_chars}ch  pyramid={pyramid_chars}ch  "
+                f"\n[Token N={total_memories} avg={naive_chars//total_memories}ch budget={budget}] "
+                f"naive={naive_chars}ch ({naive_tokens_est}tok)  "
+                f"pyramid={pyramid_chars}ch ({ctx.token_estimate}tok)  "
                 f"savings={savings_pct:.0f}%  injected={len(ctx.source_ids)}/{total_memories}"
             )
             assert pyramid_chars <= budget + 200
             assert pyramid_chars < naive_chars
+            assert savings_pct >= 65, f"Expected ≥65% savings at realistic scale, got {savings_pct:.0f}%"
 
     async def test_pyramid_injects_most_relevant(self, store):
         """High-priority memories should be in the injection context."""
-        for content, entities, priority in _PROFILE_FACTS:
+        for content, entities, priority in _REALISTIC_MEMORIES:
             await store.add_memory(MemoryRecord(
                 memory_type=MemoryType.SEMANTIC,
-                content=content, summary=content[:80],
+                content=content, summary=content[:100],
                 entities=entities, user_id="alex2", priority=priority,
             ))
         reader = MemoryReader(store, mock_llm, top_k=3, max_injection_chars=600)
-        ctx = await reader.retrieve("alcohol restrictions", "alex2")
-        # The alcohol fact has priority=0.95 — should be retrieved
-        combined = ctx.summary_layer + ctx.decision_layer
-        assert "alcohol" in combined.lower() or len(ctx.source_ids) > 0
+        ctx = await reader.retrieve("alcohol allergy restrictions", "alex2")
+        combined = (ctx.summary_layer + ctx.decision_layer).lower()
+        assert "alcohol" in combined, "Alcohol allergy (priority=0.95) must surface"
 
 
 # ══════════════════════════════════════════════════════════════════

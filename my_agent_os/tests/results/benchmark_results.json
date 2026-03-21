@@ -1,69 +1,78 @@
 {
   "hash_vs_scan_n50": {
     "n_memories": 50,
-    "hash_avg_ms": 0.089,
-    "scan_avg_ms": 0.518,
-    "speedup_x": 5.82
+    "hash_avg_ms": 0.095,
+    "scan_avg_ms": 0.487,
+    "speedup_x": 5.14
   },
   "hash_vs_scan_n200": {
     "n_memories": 200,
-    "hash_avg_ms": 0.136,
-    "scan_avg_ms": 1.763,
-    "speedup_x": 12.94
+    "hash_avg_ms": 0.128,
+    "scan_avg_ms": 1.767,
+    "speedup_x": 13.84
   },
   "hash_vs_scan_n500": {
     "n_memories": 500,
-    "hash_avg_ms": 0.19,
-    "scan_avg_ms": 4.66,
-    "speedup_x": 24.5
+    "hash_avg_ms": 0.195,
+    "scan_avg_ms": 4.454,
+    "speedup_x": 22.89
   },
-  "fts_vs_naive_n50": {
+  "fts_vs_like_n50": {
     "n_memories": 50,
-    "fts_avg_ms": 0.572,
-    "naive_avg_ms": 0.512,
-    "speedup_x": 0.9
+    "fts_avg_ms": 1.084,
+    "like_avg_ms": 0.107,
+    "speedup_x": 0.1,
+    "fts_ranked": true,
+    "like_ranked": false
   },
-  "fts_vs_naive_n200": {
+  "fts_vs_like_n200": {
     "n_memories": 200,
-    "fts_avg_ms": 7.571,
-    "naive_avg_ms": 1.976,
-    "speedup_x": 0.26
+    "fts_avg_ms": 2.957,
+    "like_avg_ms": 0.12,
+    "speedup_x": 0.04,
+    "fts_ranked": true,
+    "like_ranked": false
   },
-  "fts_vs_naive_n500": {
+  "fts_vs_like_n500": {
     "n_memories": 500,
-    "fts_avg_ms": 8.344,
-    "naive_avg_ms": 4.196,
-    "speedup_x": 0.5
+    "fts_avg_ms": 9.36,
+    "like_avg_ms": 0.115,
+    "speedup_x": 0.01,
+    "fts_ranked": true,
+    "like_ranked": false
   },
   "token_efficiency_budget800": {
     "total_memories": 20,
     "budget_chars": 800,
-    "naive_chars": 706,
-    "naive_tokens_est": 176,
-    "pyramid_chars": 272,
-    "pyramid_tokens_est": 47,
+    "naive_chars": 2458,
+    "naive_tokens_est": 614,
+    "pyramid_chars": 768,
+    "pyramid_tokens_est": 171,
     "memories_injected": 3,
-    "token_savings_pct": 61.5
+    "token_savings_pct": 68.8,
+    "avg_memory_length_chars": 122
   },
   "token_efficiency_budget1200": {
     "total_memories": 20,
     "budget_chars": 1200,
-    "naive_chars": 706,
-    "naive_tokens_est": 176,
-    "pyramid_chars": 272,
-    "pyramid_tokens_est": 47,
+    "naive_chars": 2458,
+    "naive_tokens_est": 614,
+    "pyramid_chars": 768,
+    "pyramid_tokens_est": 171,
     "memories_injected": 3,
-    "token_savings_pct": 61.5
+    "token_savings_pct": 68.8,
+    "avg_memory_length_chars": 122
   },
   "token_efficiency_budget2000": {
     "total_memories": 20,
     "budget_chars": 2000,
-    "naive_chars": 706,
-    "naive_tokens_est": 176,
-    "pyramid_chars": 272,
-    "pyramid_tokens_est": 47,
+    "naive_chars": 2458,
+    "naive_tokens_est": 614,
+    "pyramid_chars": 768,
+    "pyramid_tokens_est": 171,
     "memories_injected": 3,
-    "token_savings_pct": 61.5
+    "token_savings_pct": 68.8,
+    "avg_memory_length_chars": 122
   },
   "priority_score_table": [
     {
@@ -93,32 +102,32 @@
   ],
   "scaling_n10": {
     "n_memories": 10,
-    "avg_ms": 2.81,
-    "p95_ms": 3.33,
-    "p99_ms": 3.33
+    "avg_ms": 2.66,
+    "p95_ms": 4.18,
+    "p99_ms": 4.18
   },
   "scaling_n50": {
     "n_memories": 50,
-    "avg_ms": 4.2,
-    "p95_ms": 5.36,
-    "p99_ms": 5.36
+    "avg_ms": 4.23,
+    "p95_ms": 5.74,
+    "p99_ms": 5.74
   },
   "scaling_n100": {
     "n_memories": 100,
-    "avg_ms": 6.39,
-    "p95_ms": 8.7,
-    "p99_ms": 8.7
+    "avg_ms": 6.33,
+    "p95_ms": 8.59,
+    "p99_ms": 8.59
   },
   "scaling_n250": {
     "n_memories": 250,
-    "avg_ms": 14.25,
-    "p95_ms": 19.77,
-    "p99_ms": 19.77
+    "avg_ms": 14.87,
+    "p95_ms": 20.61,
+    "p99_ms": 20.61
   },
   "scaling_n500": {
     "n_memories": 500,
-    "avg_ms": 30.08,
-    "p95_ms": 42.98,
-    "p99_ms": 42.98
+    "avg_ms": 30.47,
+    "p95_ms": 42.74,
+    "p99_ms": 42.74
   }
 }
