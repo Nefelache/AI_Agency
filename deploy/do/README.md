@@ -40,6 +40,15 @@ python3 setup.py
 按提示输入 DeepSeek API Key、手机号等，回车可自动生成 API 密钥。  
 或手动复制并编辑：`cp my_agent_os/config/.env.example my_agent_os/config/.env`
 
+**重新部署后网页没有 Owner Key？** 若 `.env` 是从模板复制的，里面的 `API_KEY_OWNER=your-owner-key` 只是占位符，**不会**自动变成可用密钥。在服务器项目根目录执行（非交互，会生成并打印新密钥）：
+
+```bash
+python3 scripts/ensure_api_keys.py
+docker compose restart agent-os
+```
+
+终端会打印 `API_KEY_OWNER=os-owner-...`，复制到浏览器顶部「API KEY」即可。
+
 ## 4. Start the stack
 
 From repo root:
@@ -47,6 +56,15 @@ From repo root:
 ```bash
 docker compose up -d --build
 docker compose ps
+```
+
+默认会同时启动 `memory-maintenance` 服务（每 24 小时一次），自动把近期碎片化 episodic 记忆整理为 semantic 并清理低价值片段。
+
+可选配置（写到根目录 `.env`）：
+
+```bash
+MEMORY_MAINTENANCE_INTERVAL_SECONDS=86400
+MEMORY_MAINTENANCE_USER_ID=default
 ```
 
 ## 5. Link WhatsApp (QR)

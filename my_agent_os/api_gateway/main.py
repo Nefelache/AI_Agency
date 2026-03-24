@@ -16,7 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from my_agent_os.api_gateway.routes import mobile_webhook, web_terminal, memory_api, whatsapp, health_ext, audit_api
+from my_agent_os.api_gateway.routes import auth_routes, billing, gdpr, voice, slack
 from my_agent_os.config.settings import settings
+from my_agent_os.version import __version__ as APP_VERSION
 
 _STATIC_DIR = Path(__file__).parent / "static"
 
@@ -44,6 +46,10 @@ async def lifespan(app: FastAPI):
     set_memory_engine(engine)
     set_crew_orchestrator(crew)
     memory_api.set_engine(engine)
+    gdpr.set_engine(engine)
+
+    from my_agent_os.agent_core.router_engine import route as _route_fn
+    slack.set_router(_route_fn)
 
     # Enterprise: prune old audit logs on startup (best-effort)
     try:
@@ -58,7 +64,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Agent OS — Neural Gateway",
-    version="0.7.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
@@ -75,11 +81,21 @@ app.include_router(memory_api.router, prefix="/memory", tags=["Memory"])
 app.include_router(whatsapp.router)
 app.include_router(health_ext.router, tags=["Health"])
 app.include_router(audit_api.router)
+app.include_router(auth_routes.router)
+app.include_router(billing.router)
+app.include_router(gdpr.router)
+app.include_router(voice.router)
+app.include_router(slack.router)
 
 
 @app.get("/")
 async def index():
     return FileResponse(_STATIC_DIR / "index.html")
+
+
+@app.get("/setup")
+async def onboarding():
+    return FileResponse(_STATIC_DIR / "onboarding.html")
 
 
 @app.get("/health")

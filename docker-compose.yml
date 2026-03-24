@@ -20,6 +20,27 @@ services:
       - "127.0.0.1:8000:8000"  # Expose to host for system Caddy
     restart: unless-stopped
 
+  memory-maintenance:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # App config is read from mounted my_agent_os/config/.env
+      - MEMORY_MAINTENANCE_INTERVAL_SECONDS=${MEMORY_MAINTENANCE_INTERVAL_SECONDS:-86400}
+      - MEMORY_MAINTENANCE_USER_ID=${MEMORY_MAINTENANCE_USER_ID:-default}
+    volumes:
+      - ./my_agent_os/memory_layer/data:/app/my_agent_os/memory_layer/data
+      - ./my_agent_os/config/.env:/app/my_agent_os/config/.env:ro
+      - ./my_agent_os/config/channels.yaml:/app/my_agent_os/config/channels.yaml:ro
+    command: >
+      sh -c "while true; do
+      python /app/scripts/memory_maintenance.py --user-id $$MEMORY_MAINTENANCE_USER_ID;
+      sleep $$MEMORY_MAINTENANCE_INTERVAL_SECONDS;
+      done"
+    depends_on:
+      - agent-os
+    restart: unless-stopped
+
   whatsapp-bridge:
     build:
       context: ./channels/whatsapp-bridge

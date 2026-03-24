@@ -195,6 +195,24 @@ class MemoryEngine:
         await self._ensure_init()
         return await self._store.stats(user_id)
 
+    async def run_maintenance(
+        self,
+        user_id: str,
+        lookback_days: int = 7,
+        max_items: int = 30,
+    ) -> dict[str, Any]:
+        """
+        Background memory maintenance:
+          - consolidate recent episodic fragments into a semantic memory
+          - prune low-signal episodic fragments after consolidation
+        """
+        await self._ensure_init()
+        return await self._writer.consolidate_episodic_memories(
+            user_id=user_id,
+            lookback_days=lookback_days,
+            max_items=max_items,
+        )
+
     # ── File Ingestion ───────────────────────────────────
 
     async def ingest_file(

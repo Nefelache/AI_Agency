@@ -54,6 +54,17 @@ class Settings(BaseSettings):
     MQTT_BROKER: str = "localhost"
     MQTT_PORT: int = 1883
 
+    # --- Multi-user JWT ---
+    JWT_SECRET: str = ""           # Set a strong random secret in production
+    USERS_DB_PATH: str = "my_agent_os/memory_layer/data/users.db"
+
+    # --- Stripe Billing ---
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_PRO: str = ""
+    STRIPE_PRICE_ENTERPRISE: str = ""
+    APP_BASE_URL: str = "http://localhost:8000"
+
     # --- WhatsApp ---
     WHATSAPP_BRIDGE_SECRET: str = ""  # Shared secret for Baileys bridge
     WHATSAPP_ALLOW_FROM: str = ""  # Comma-separated E.164 numbers (e.g. +15551234567,+8613800138000)

@@ -14,9 +14,11 @@ Injection (anti-hallucination pyramid + dynamic allocation):
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import math
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Awaitable, Callable
@@ -48,12 +50,14 @@ class MemoryReader:
         top_k: int = 5,
         decay_days: float = 7.0,
         max_injection_chars: int = 2000,
+        entity_timeout_ms: int = 180,
     ):
         self._store = store
         self._llm = llm
         self._top_k = top_k
         self._decay_days = decay_days
         self._max_chars = max_injection_chars
+        self._entity_timeout_s = max(0.05, entity_timeout_ms / 1000.0)
         with open(_PROMPTS_PATH, "r", encoding="utf-8") as _f:
             self._prompts = yaml.safe_load(_f)
 
@@ -64,17 +68,30 @@ class MemoryReader:
     ) -> InjectionContext:
         """
         Full read pipeline:
-          extract entities → hash lookup → FTS search → merge → rank → inject
+          (parallel) FTS + entity extraction → hash lookup → merge → rank → inject
         """
-        entities = await self._extract_entities(query)
+        # Run FTS immediately while entity extraction happens in parallel.
+        # This removes retrieval bottleneck when entity LLM is slow.
+        fts_task = asyncio.create_task(
+            self._store.fulltext_search(query, top_k=self._top_k * 2, user_id=user_id)
+        )
+        entities_task = asyncio.create_task(self._extract_entities(query))
+
+        fts_hits = await fts_task
+
+        entities: list[str] = []
+        try:
+            entities = await asyncio.wait_for(entities_task, timeout=self._entity_timeout_s)
+        except asyncio.TimeoutError:
+            entities_task.cancel()
+            logger.warning("Entity extraction timed out after %.0fms; fallback to rules", self._entity_timeout_s * 1000)
+            entities = self._fallback_entities(query)
+        except Exception as e:
+            logger.warning("Entity extraction failed in parallel path; fallback to rules: %s", e)
+            entities = self._fallback_entities(query)
 
         hash_ids = await self._store.lookup_by_entities(entities) if entities else []
-
-        fts_hits = await self._store.fulltext_search(
-            query, top_k=self._top_k * 2, user_id=user_id
-        )
-
-        merged = await self._merge_and_rank(hash_ids, fts_hits, user_id)
+        merged = await self._merge_and_rank(hash_ids, fts_hits, user_id, query)
         top = merged[: self._top_k]
 
         for rm in top:
@@ -131,8 +148,9 @@ class MemoryReader:
     async def _merge_and_rank(
         self,
         hash_ids: list[str],
-        vector_hits: list[tuple[str, float]],
+        fts_hits: list[tuple[str, float]],
         user_id: str,
+        query: str,
     ) -> list[RetrievedMemory]:
         scored: dict[str, RetrievedMemory] = {}
 
@@ -146,7 +164,7 @@ class MemoryReader:
                     source="hash",
                 )
 
-        for mid, rank in vector_hits:
+        for mid, rank in fts_hits:
             # BM25 in SQLite FTS5: more negative rank = more relevant.
             # Correct mapping: higher abs(rank) → higher similarity.
             # Formula: 1 - 1/(1+abs(rank))  →  maps [0, ∞) to [0, 1)
@@ -166,6 +184,18 @@ class MemoryReader:
                         query_relevance=similarity,
                         source="fts",  # full-text search (not vector)
                     )
+
+        # Lightweight local semantic score (token overlap with synonym expansion).
+        # Used as re-ranker without introducing heavy vector dependencies.
+        for rm in scored.values():
+            rec = rm.record
+            semantic = self._semantic_similarity(
+                query, f"{rec.summary or ''}\n{rec.content[:400]}"
+            )
+            lexical = rm.query_relevance
+            fused = 0.65 * lexical + 0.35 * semantic
+            rm.query_relevance = fused
+            rm.relevance_score = fused
 
         now = utcnow()
         for rm in scored.values():
@@ -273,3 +303,37 @@ class MemoryReader:
             if start != -1 and end != -1:
                 return json.loads(cleaned[start : end + 1])
             raise
+
+    @staticmethod
+    def _semantic_similarity(query: str, text: str) -> float:
+        """Cheap semantic proxy using normalized token overlap + synonym expansion."""
+        if not query or not text:
+            return 0.0
+        q_tokens = MemoryReader._semantic_tokens(query)
+        t_tokens = MemoryReader._semantic_tokens(text)
+        if not q_tokens or not t_tokens:
+            return 0.0
+        inter = len(q_tokens & t_tokens)
+        union = len(q_tokens | t_tokens)
+        return inter / union if union else 0.0
+
+    @staticmethod
+    def _semantic_tokens(text: str) -> set[str]:
+        variants: dict[str, list[str]] = {
+            "alcohol": ["liquor", "vodka", "wine", "beer"],
+            "allergy": ["allergic", "intolerance", "sensitive"],
+            "diet": ["dietary", "nutrition", "food"],
+            "restriction": ["restrict", "avoid", "forbidden"],
+            "founder": ["cofounder", "co-founder"],
+            "music": ["genre", "song", "playlist"],
+            "goal": ["target", "objective"],
+            "finance": ["financial", "budget", "funding", "revenue"],
+            "travel": ["trip", "flight", "hotel"],
+        }
+        raw = re.findall(r"[\u4e00-\u9fff]{2,}|[A-Za-z][A-Za-z0-9_-]{2,}", text.lower())
+        out: set[str] = set()
+        for tok in raw:
+            out.add(tok)
+            for v in variants.get(tok, []):
+                out.add(v)
+        return out

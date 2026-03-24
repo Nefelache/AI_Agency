@@ -1,5 +1,7 @@
 # Agent OS — Local AI Agent Hub
 
+**Version 1.0.0**
+
 A fully local, privacy-first AI command center for high-performance individuals.
 Designed to eliminate **Task Paralysis** through calm, intelligent automation.
 
@@ -36,6 +38,9 @@ channels/
 # 1. 交互式配置（推荐）
 python setup.py
 
+# 若只有模板 .env、部署后没有拿到 API_KEY_OWNER，可非交互补全并打印密钥：
+# python scripts/ensure_api_keys.py && docker compose restart agent-os
+
 # 2. Create virtual environment
 python -m venv .venv && source .venv/bin/activate
 
@@ -49,6 +54,16 @@ python run.py
 pytest my_agent_os/tests/ -v
 cd channels/whatsapp-bridge && npm test
 ```
+
+### Optional: Memory maintenance (recommended)
+
+Run periodic consolidation to keep memory compact and high-signal:
+
+```bash
+python scripts/memory_maintenance.py --user-id default
+```
+
+In Docker Compose deployment, `memory-maintenance` runs automatically every 24h.
 
 ## Adding a New Skill
 

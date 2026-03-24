@@ -13,6 +13,7 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY my_agent_os /app/my_agent_os
+COPY scripts /app/scripts
 
 # Data dirs (SQLite, audit logs) will be mounted as volumes in compose
 EXPOSE 8000

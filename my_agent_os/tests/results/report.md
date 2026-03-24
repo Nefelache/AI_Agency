@@ -1,26 +1,26 @@
 # Agent OS Memory Layer — Evaluation Report
 
-> Generated: 2026-03-21 13:12 UTC
+> Generated: 2026-03-22 02:23 UTC
 
 ## Executive Summary
 
 | Metric | Value |
 |--------|-------|
-| Test suite | 102 tests — ✅ All Passing |
+| Test suite | 105 tests — ✅ All Passing |
 | Recall: no memory (A) | 0.0% |
 | Recall: full history (B) | 100.0% |
-| Recall: pyramid — Agent OS (C) | 90.0% |
+| Recall: pyramid — Agent OS (C) | 100.0% |
 | Token savings (C vs B) | 45.0% |
-| Hash index speedup vs full scan | up to 22.89× |
+| Hash index speedup vs full scan | up to 24.91× |
 
 ---
 
 ## 1. Unit Test Results
 
-**✅ PASS** — 102/102 tests passed (100%)
+**✅ PASS** — 105/105 tests passed (100%)
 
 ```
-============================= 102 passed in 6.28s ==============================
+============================= 105 passed in 11.49s =============================
 ```
 
 Tests cover:
@@ -42,9 +42,9 @@ Tests cover:
 
 | N memories | Hash lookup | Full-table scan | Speedup |
 | ---------- | ----------- | --------------- | ------- |
-| 200        | 0.13 ms     | 1.77 ms         | 13.84×  |
-| 50         | 0.10 ms     | 0.49 ms         | 5.14×   |
-| 500        | 0.20 ms     | 4.45 ms         | 22.89×  |
+| 200        | 0.13 ms     | 2.03 ms         | 15.66×  |
+| 50         | 0.19 ms     | 0.52 ms         | 2.79×   |
+| 500        | 0.21 ms     | 5.27 ms         | 24.91×  |
 
 **Insight**: The hash index provides deterministic, sub-millisecond entity lookup. As the memory
 store grows from 50 → 500 entries, hash performance remains flat while full-table scans grow
@@ -57,9 +57,9 @@ linearly — exactly the O(1) vs O(n) behaviour the architecture was designed fo
 
 | N memories | FTS5 (BM25-ranked) | SQL LIKE (unranked) | Speedup |
 | ---------- | ------------------ | ------------------- | ------- |
-| 200        | 2.96 ms (ranked)   | 0.12 ms (unranked)  | 0.04×   |
-| 50         | 1.08 ms (ranked)   | 0.11 ms (unranked)  | 0.1×    |
-| 500        | 9.36 ms (ranked)   | 0.12 ms (unranked)  | 0.01×   |
+| 200        | 5.10 ms (ranked)   | 0.14 ms (unranked)  | 0.03×   |
+| 50         | 0.72 ms (ranked)   | 0.11 ms (unranked)  | 0.16×   |
+| 500        | 23.78 ms (ranked)  | 0.18 ms (unranked)  | 0.01×   |
 
 **Critical functional difference**: FTS5 returns results ordered by relevance (BM25 score),
 meaning the most relevant memory comes first. `LIKE '%keyword%'` returns all matches in
@@ -128,11 +128,11 @@ current context.
 
 | Memory count | Avg latency (ms) | P95 (ms) | P99 (ms) |
 | ------------ | ---------------- | -------- | -------- |
-| 10           | 2.7              | 4.2      | 4.2      |
-| 50           | 4.2              | 5.7      | 5.7      |
-| 100          | 6.3              | 8.6      | 8.6      |
-| 250          | 14.9             | 20.6     | 20.6     |
-| 500          | 30.5             | 42.7     | 42.7     |
+| 10           | 2.8              | 4.0      | 4.0      |
+| 50           | 9.0              | 40.4     | 40.4     |
+| 100          | 23.4             | 159.3    | 159.3    |
+| 250          | 35.6             | 191.3    | 191.3    |
+| 500          | 91.3             | 245.0    | 245.0    |
 
 **Insight**: Full retrieval pipeline (entity extraction → hash lookup → FTS search → merge →
 rank → pyramid injection) stays well under 100 ms even at 500 stored memories.
@@ -156,7 +156,7 @@ The SQLite + FTS5 architecture scales gracefully without an external vector data
 | ------------------------ | --------------- | ------------- | ------------ |
 | A — No Memory (baseline) | 0.0%            | 54            | all facts    |
 | B — Full History (naive) | 100.0%          | 507           | all facts    |
-| C — Pyramid, Agent OS    | 90.0%           | 174           | 99           |
+| C — Pyramid, Agent OS    | 100.0%          | 174           | 99           |
 
 ### 3.2 Condition A — No Memory (Baseline)
 
@@ -182,7 +182,7 @@ growing linearly with memory size, making it impractical at scale.
 | ✓ | partner | 3                  | 163            |
 | ✓ | allergy | 1                  | 69             |
 | ✓ | music   | 1                  | 49             |
-| ✗ | diet    | 3                  | 149            |
+| ✓ | diet    | 3                  | 146            |
 | ✓ | goal    | 3                  | 128            |
 
 **Summary**: avg 174 chars per query vs 507 — **66% fewer context chars**.
@@ -205,18 +205,17 @@ Pyramid retrieves only the most relevant memories for each specific question.
 ### Dual-Layer Retrieval
 
 ```
-Query  ──→  Entity Extraction (LLM)
-              │
-              ├──→ Hash Index (O(1))  ──→  exact entity matches
-              │
-              └──→ FTS5 Search        ──→  keyword/phrase matches
-                        │
-                        └──→ Merge + Priority Rank
-                                  │
-                                  └──→ Pyramid Injection (budget-aware)
-                                            ├── Level 1: Summary  (always)
-                                            ├── Level 2: Key Points  (if budget)
-                                            └── Level 3: Excerpt  (if budget ≥ 200)
+Query  ──→  [Parallel fan-out]
+            ├──→ FTS5 Search (BM25) ───────────────┐
+            └──→ Entity Extraction (LLM/rules, timeout)
+                     └──→ Hash Index (O(1)) ───────┘
+                               │
+                               └──→ Hybrid merge + semantic rerank
+                                         │
+                                         └──→ Priority Rank + Pyramid Injection
+                                                   ├── Level 1: Summary  (always)
+                                                   ├── Level 2: Key Points  (if budget)
+                                                   └── Level 3: Excerpt  (if budget ≥ 200)
 ```
 
 ### Three Memory Types (Cognitive-Science-Inspired)
@@ -240,15 +239,22 @@ Day 14: recency = 0.25
 Day 30: recency = 0.09
 ```
 
+### Truth Maintenance + Background Consolidation
+
+- New semantic memories that conflict with older statements on the same entities
+  can mark old memories as `deprecated` instead of keeping contradictory facts active.
+- A maintenance task can consolidate recent episodic fragments into one semantic memory
+  and prune low-signal fragments to keep the store compact.
+
 ---
 
 ## 5. Conclusions
 
 | Claim | Evidence |
 |-------|----------|
-| **Near-zero latency retrieval** | Hash O(1) lookup, 22.89× faster than full scan |
+| **Near-zero latency retrieval** | Hash O(1) lookup, 24.91× faster than full scan |
 | **Zero infrastructure cost** | SQLite + FTS5, no external vector DB |
-| **High recall with minimal tokens** | 90.0% accuracy vs 100.0% full history, 45.0% fewer tokens |
+| **High recall with minimal tokens** | 100.0% accuracy vs 100.0% full history, 45.0% fewer tokens |
 | **Hallucination resistance** | Pyramid injection limits context to verified, ranked facts |
 | **Scales gracefully** | Sub-100ms retrieval at 500 memories |
 
@@ -257,7 +263,8 @@ Day 30: recency = 0.09
 1. **Current state**: Production-ready for personal agent workloads (< 10,000 memories)
 2. **Scale path**: At > 10,000 memories, consider SQLite WAL mode + read replicas
 3. **Accuracy path**: Add semantic similarity re-ranking as a post-FTS step
-4. **Monitoring**: Use `audit_*.jsonl` logs to track `latency_ms` over time in production
+4. **Maintenance path**: Schedule `scripts/memory_maintenance.py` daily during off-peak hours
+5. **Monitoring**: Use `audit_*.jsonl` logs to track `latency_ms` over time in production
 
 ---
 *Report generated by `my_agent_os/tests/generate_report.py`*

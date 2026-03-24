@@ -11,7 +11,9 @@ Run: pytest my_agent_os/tests/test_memory_layer.py -v
 
 from __future__ import annotations
 
+import asyncio
 import json
+import time
 from datetime import timedelta
 from pathlib import Path
 
@@ -545,3 +547,61 @@ class TestMemoryWriter:
         session = await store.create_session("user1")
         result = await writer.seal_session(session.id, "user1")
         assert isinstance(result, dict)
+
+    async def test_truth_maintenance_deprecates_conflicting_semantic(self, writer, store):
+        old = make_record(
+            "I hate spicy food and avoid chili.",
+            memory_type=MemoryType.SEMANTIC,
+            entities=["spicy", "food", "chili"],
+            user_id="user1",
+        )
+        await store.add_memory(old)
+
+        await writer._consolidate_one(
+            "I now love spicy food and enjoy chili.",
+            MemoryType.SEMANTIC,
+            session_id="s1",
+            user_id="user1",
+        )
+
+        old_after = await store.get_memory(old.id)
+        assert old_after is not None
+        assert old_after.status.value == "deprecated"
+
+    async def test_episodic_consolidation_creates_semantic_and_prunes(self, writer, store):
+        for i in range(4):
+            await store.add_memory(make_record(
+                f"Meeting note {i}: discussed roadmap priorities and launch plan.",
+                memory_type=MemoryType.EPISODIC,
+                user_id="user1",
+                priority=0.5,
+            ))
+
+        out = await writer.consolidate_episodic_memories("user1", lookback_days=7, max_items=10)
+        assert out["consolidated"] in (0, 1)
+        all_mem = await store.get_all_memories("user1", limit=200)
+        semantics = [m for m in all_mem if m.memory_type == MemoryType.SEMANTIC]
+        assert len(semantics) >= 1
+
+
+class TestPipelineImprovements:
+    async def test_entity_timeout_does_not_block_retrieval(self, store):
+        async def slow_llm(system: str, user: str, json_mode: bool = False) -> str:
+            if "entity" in system.lower():
+                await asyncio.sleep(0.5)
+                return json.dumps({"entities": ["music"]})
+            return json.dumps({"answer": "ok"})
+
+        await store.add_memory(make_record(
+            "User enjoys classical music and jazz concerts.",
+            entities=["music", "jazz"],
+            user_id="user1",
+        ))
+        reader = MemoryReader(store, slow_llm, top_k=3, max_injection_chars=800, entity_timeout_ms=50)
+
+        t0 = time.perf_counter()
+        ctx = await reader.retrieve("music preferences", "user1")
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+
+        assert len(ctx.source_ids) >= 1
+        assert elapsed_ms < 300, f"retrieve took too long: {elapsed_ms:.1f}ms"

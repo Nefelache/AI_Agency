@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent OS — Setup</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#212121;--surface:#2f2f2f;--surface-hi:#3a3a3a;
+  --border:#404040;--text:#ececec;--text-dim:#8a8a8a;--text-muted:#5a5a5a;
+  --accent:#19c37d;--accent-dim:#0d6e46;--error:#ef4444;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'SF Mono','Cascadia Code','Consolas',monospace;
+  --radius:10px;--trans:.18s ease;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px}
+
+#wizard{
+  max-width:540px;margin:0 auto;padding:40px 20px;
+  display:flex;flex-direction:column;gap:0;min-height:100vh;
+}
+
+/* ── Header ── */
+.wz-header{text-align:center;padding:32px 0 28px;position:relative}
+.wz-logo{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:16px}
+.wz-logo .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent-dim)}
+.wz-logo h1{font-size:20px;font-weight:600;letter-spacing:.5px}
+.wz-subtitle{color:var(--text-dim);font-size:14px}
+
+/* ── Progress ── */
+.progress-bar{display:flex;gap:6px;justify-content:center;margin-bottom:32px}
+.pb-step{
+  width:8px;height:8px;border-radius:50%;background:var(--border);
+  transition:background var(--trans),transform var(--trans);
+}
+.pb-step.done{background:var(--accent-dim)}
+.pb-step.active{background:var(--accent);transform:scale(1.3)}
+
+/* ── Steps ── */
+.step{display:none;flex-direction:column;gap:20px;animation:fadeIn .3s ease}
+.step.active{display:flex}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.step-title{font-size:22px;font-weight:600;text-align:center}
+.step-desc{color:var(--text-dim);font-size:14px;text-align:center;line-height:1.7}
+
+/* ── Form elements ── */
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:12px;color:var(--text-dim);font-family:var(--mono);text-transform:uppercase;letter-spacing:.4px}
+.field input,.field select{
+  padding:11px 14px;border-radius:var(--radius);
+  border:1px solid var(--border);background:var(--surface);
+  color:var(--text);font-family:var(--font);font-size:14px;outline:none;
+  transition:border-color var(--trans);
+}
+.field input:focus,.field select:focus{border-color:var(--accent-dim)}
+.field .hint{font-size:11px;color:var(--text-muted)}
+.field-row{display:flex;gap:10px}
+.field-row .field{flex:1}
+
+/* ── Buttons ── */
+.btn-row{display:flex;gap:10px;margin-top:4px}
+.btn{
+  flex:1;padding:12px;border-radius:var(--radius);border:none;cursor:pointer;
+  font-family:var(--font);font-size:14px;font-weight:500;transition:opacity var(--trans);
+}
+.btn-primary{background:var(--accent);color:#0e0e10}
+.btn-primary:hover{opacity:.85}
+.btn-secondary{background:var(--surface);color:var(--text-dim);border:1px solid var(--border)}
+.btn-secondary:hover{color:var(--text);background:var(--surface-hi)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ── Status/Error ── */
+.status-msg{
+  padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;
+  display:none;
+}
+.status-msg.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;display:block}
+.status-msg.success{background:rgba(25,195,125,.1);border:1px solid var(--accent-dim);color:var(--accent);display:block}
+
+/* ── Key display ── */
+.key-box{
+  background:#1a1a2e;border:1px solid #2d2d5e;border-radius:var(--radius);
+  padding:14px 16px;font-family:var(--mono);font-size:13px;color:#a8c7fa;
+  word-break:break-all;position:relative;
+}
+.copy-btn{
+  position:absolute;top:8px;right:10px;
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:3px 10px;font-size:11px;color:var(--text-dim);cursor:pointer;
+  transition:all var(--trans);
+}
+.copy-btn:hover{color:var(--text);border-color:var(--accent-dim)}
+
+/* ── QR code area ── */
+.qr-area{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:24px;display:flex;flex-direction:column;align-items:center;gap:12px;
+  min-height:220px;justify-content:center;
+}
+.qr-area .qr-status{font-size:13px;color:var(--text-dim)}
+.qr-area img{max-width:180px;border-radius:8px;background:#fff;padding:8px}
+#qr-loader{display:flex;flex-direction:column;align-items:center;gap:8px}
+.spin{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Plan cards ── */
+.plan-cards{display:flex;gap:10px}
+.plan-card{
+  flex:1;padding:14px;border:2px solid var(--border);border-radius:var(--radius);
+  cursor:pointer;transition:all var(--trans);text-align:center;
+}
+.plan-card:hover{border-color:var(--accent-dim)}
+.plan-card.selected{border-color:var(--accent);background:rgba(25,195,125,.06)}
+.plan-card .plan-name{font-size:14px;font-weight:600;margin-bottom:4px}
+.plan-card .plan-price{font-size:22px;font-weight:700;color:var(--accent)}
+.plan-card .plan-price span{font-size:12px;font-weight:400;color:var(--text-dim)}
+.plan-card .plan-feat{font-size:11px;color:var(--text-muted);margin-top:6px;line-height:1.6}
+
+/* ── Done / summary ── */
+.done-icon{font-size:48px;text-align:center}
+.summary-list{display:flex;flex-direction:column;gap:8px}
+.summary-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;background:var(--surface);border-radius:var(--radius);
+  font-size:13px;
+}
+.summary-item .si-icon{font-size:16px;width:24px;text-align:center;flex-shrink:0}
+.summary-item .si-label{color:var(--text-dim);font-size:11px}
+.summary-item .si-val{font-weight:500}
+</style>
+</head>
+<body>
+<div id="wizard">
+  <div class="wz-header">
+    <div class="wz-logo">
+      <div class="dot"></div>
+      <h1>Agent OS Setup</h1>
+    </div>
+    <div class="wz-subtitle">Get your AI command center ready in 3 steps</div>
+  </div>
+
+  <div class="progress-bar">
+    <div class="pb-step active" id="pb-0"></div>
+    <div class="pb-step" id="pb-1"></div>
+    <div class="pb-step" id="pb-2"></div>
+    <div class="pb-step" id="pb-3"></div>
+  </div>
+
+  <!-- Step 0: Account -->
+  <div class="step active" id="step-0">
+    <div class="step-title">Create Your Account</div>
+    <div class="step-desc">Your memories and agent settings are private to you.</div>
+    <div id="auth-toggle" style="display:flex;gap:8px;margin-bottom:4px">
+      <button class="btn btn-primary" style="flex:none;padding:7px 18px;font-size:12px" onclick="setMode('register')">Register</button>
+      <button class="btn btn-secondary" style="flex:none;padding:7px 18px;font-size:12px" onclick="setMode('login')">Log In</button>
+    </div>
+    <div class="field"><label>Email</label><input id="reg-email" type="email" placeholder="you@example.com"></div>
+    <div class="field"><label>Password</label><input id="reg-password" type="password" placeholder="At least 8 characters"></div>
+    <div id="step0-msg" class="status-msg"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="handleAuth()">Continue →</button>
+    </div>
+    <div style="text-align:center;font-size:12px;color:var(--text-muted)">Or use your existing <a href="/" style="color:var(--accent)">API key</a></div>
+  </div>
+
+  <!-- Step 1: Plan -->
+  <div class="step" id="step-1">
+    <div class="step-title">Choose Your Plan</div>
+    <div class="step-desc">Start free — upgrade anytime as you scale.</div>
+    <div class="plan-cards">
+      <div class="plan-card selected" id="pc-free" onclick="selectPlan('free')">
+        <div class="plan-name">Free</div>
+        <div class="plan-price">$0<span>/mo</span></div>
+        <div class="plan-feat">500 memories<br>20 req/min<br>All skills</div>
+      </div>
+      <div class="plan-card" id="pc-pro" onclick="selectPlan('pro')">
+        <div class="plan-name">Pro</div>
+        <div class="plan-price">$19<span>/mo</span></div>
+        <div class="plan-feat">10K memories<br>120 req/min<br>Priority routing</div>
+      </div>
+      <div class="plan-card" id="pc-enterprise" onclick="selectPlan('enterprise')">
+        <div class="plan-name">Enterprise</div>
+        <div class="plan-price">$99<span>/mo</span></div>
+        <div class="plan-feat">Unlimited<br>600 req/min<br>SLA + support</div>
+      </div>
+    </div>
+    <div id="step1-msg" class="status-msg"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goTo(0)">← Back</button>
+      <button class="btn btn-primary" onclick="handlePlan()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 2: WhatsApp (optional) -->
+  <div class="step" id="step-2">
+    <div class="step-title">Link WhatsApp (Optional)</div>
+    <div class="step-desc">Get AI replies directly in WhatsApp. You can skip this and set it up later.</div>
+    <div class="qr-area" id="qr-area">
+      <div id="qr-loader">
+        <div class="spin"></div>
+        <div class="qr-status">Click "Get QR Code" to start linking</div>
+      </div>
+      <img id="qr-img" style="display:none" alt="WhatsApp QR Code">
+      <div class="qr-status" id="qr-msg" style="display:none"></div>
+    </div>
+    <div id="step2-msg" class="status-msg"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goTo(1)">← Back</button>
+      <button class="btn btn-secondary" onclick="fetchQR()" id="qr-btn">Get QR Code</button>
+      <button class="btn btn-primary" onclick="goTo(3)">Skip →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Done -->
+  <div class="step" id="step-3">
+    <div class="done-icon">✅</div>
+    <div class="step-title">You're All Set!</div>
+    <div class="step-desc">Your API key has been saved. Start chatting with Agent OS.</div>
+    <div class="summary-list" id="summary-list"></div>
+    <div id="api-key-display" style="display:none">
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;font-family:var(--mono)">YOUR API KEY (save this — shown once)</div>
+      <div class="key-box" id="api-key-box">
+        <button class="copy-btn" onclick="copyKey()">Copy</button>
+        <span id="api-key-val"></span>
+      </div>
+    </div>
+    <div class="btn-row">
+      <a href="/" class="btn btn-primary" style="text-decoration:none;text-align:center">Open Agent OS →</a>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentStep = 0;
+let authToken   = '';
+let selectedPlan = 'free';
+let authMode    = 'register';
+let apiKeyValue = localStorage.getItem('agentos_key') || '';
+
+function setMode(mode) {
+  authMode = mode;
+  document.getElementById('reg-password').placeholder = mode === 'register'
+    ? 'At least 8 characters' : 'Your password';
+  document.querySelectorAll('#auth-toggle button').forEach((b, i) => {
+    const isActive = (i === 0 && mode === 'register') || (i === 1 && mode === 'login');
+    b.className = isActive ? 'btn btn-primary' : 'btn btn-secondary';
+    b.style.cssText = 'flex:none;padding:7px 18px;font-size:12px';
+  });
+}
+
+function goTo(n) {
+  document.getElementById(`step-${currentStep}`).classList.remove('active');
+  document.getElementById(`pb-${currentStep}`).classList.remove('active');
+  document.getElementById(`pb-${currentStep}`).classList.add('done');
+  currentStep = n;
+  document.getElementById(`step-${currentStep}`).classList.add('active');
+  document.getElementById(`pb-${currentStep}`).classList.add('active');
+}
+
+function showMsg(id, msg, type) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = `status-msg ${type}`;
+}
+
+function selectPlan(plan) {
+  selectedPlan = plan;
+  ['free','pro','enterprise'].forEach(p => {
+    document.getElementById(`pc-${p}`).classList.toggle('selected', p === plan);
+  });
+}
+
+async function handleAuth() {
+  const email = document.getElementById('reg-email').value.trim();
+  const pass  = document.getElementById('reg-password').value;
+  if (!email || !pass) { showMsg('step0-msg','Email and password required.','error'); return; }
+
+  const endpoint = authMode === 'register' ? '/auth/register' : '/auth/login';
+  try {
+    const r = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email, password: pass, plan: 'free'}),
+    });
+    const d = await r.json();
+    if (!r.ok) { showMsg('step0-msg', d.detail || 'Auth failed.', 'error'); return; }
+    authToken = d.token;
+    localStorage.setItem('agentos_jwt', authToken);
+    goTo(1);
+  } catch(e) {
+    showMsg('step0-msg', e.message, 'error');
+  }
+}
+
+async function handlePlan() {
+  if (selectedPlan === 'free') { goTo(2); return; }
+  if (!authToken) { goTo(0); return; }
+  try {
+    const r = await fetch('/billing/checkout', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':`Bearer ${authToken}`},
+      body: JSON.stringify({plan: selectedPlan}),
+    });
+    const d = await r.json();
+    if (!r.ok) { showMsg('step1-msg', d.detail || 'Checkout failed.', 'error'); return; }
+    window.location.href = d.checkout_url;
+  } catch(e) {
+    showMsg('step1-msg', e.message, 'error');
+  }
+}
+
+async function fetchQR() {
+  document.getElementById('qr-btn').disabled = true;
+  document.getElementById('qr-loader').style.display = 'flex';
+  document.getElementById('qr-img').style.display    = 'none';
+  document.getElementById('qr-msg').style.display    = 'none';
+  try {
+    const r = await fetch('/whatsapp/qr', {
+      headers: {'X-API-Key': apiKeyValue || ''},
+    });
+    if (!r.ok) { showMsg('step2-msg', 'QR endpoint unavailable — start the WhatsApp bridge first.', 'error'); return; }
+    const d = await r.json();
+    if (d.qr_url || d.qr) {
+      const img = document.getElementById('qr-img');
+      img.src = d.qr_url || `data:image/png;base64,${d.qr}`;
+      img.style.display = 'block';
+      document.getElementById('qr-loader').style.display = 'none';
+      document.getElementById('qr-msg').textContent = 'Scan with WhatsApp → Linked Devices → Link a Device';
+      document.getElementById('qr-msg').style.display = 'block';
+      pollWhatsApp();
+    } else {
+      showMsg('step2-msg', 'No QR code returned. Is the bridge running?', 'error');
+    }
+  } catch(e) {
+    showMsg('step2-msg', 'Bridge not reachable: ' + e.message, 'error');
+  } finally {
+    document.getElementById('qr-btn').disabled = false;
+  }
+}
+
+async function pollWhatsApp() {
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    try {
+      const r = await fetch('/health/whatsapp');
+      const d = await r.json();
+      if (d.whatsapp === 'connected') {
+        document.getElementById('qr-msg').textContent = '✅ WhatsApp connected!';
+        document.getElementById('qr-msg').style.color = '#19c37d';
+        document.getElementById('qr-img').style.display = 'none';
+        break;
+      }
+    } catch { break; }
+  }
+}
+
+// Build done summary and show API key
+function buildSummary() {
+  const items = [
+    { icon: '👤', label: 'Account', val: localStorage.getItem('agentos_jwt') ? 'Registered' : 'API Key auth' },
+    { icon: '📋', label: 'Plan', val: selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1) },
+    { icon: '🧠', label: 'Memory', val: 'Active (SQLite + FTS5 + mmap)' },
+    { icon: '⚡', label: 'Skills', val: '9 tools ready' },
+  ];
+  const list = document.getElementById('summary-list');
+  list.innerHTML = items.map(i =>
+    `<div class="summary-item"><div class="si-icon">${i.icon}</div><div><div class="si-label">${i.label}</div><div class="si-val">${i.val}</div></div></div>`
+  ).join('');
+
+  if (apiKeyValue) {
+    document.getElementById('api-key-val').textContent = apiKeyValue;
+    document.getElementById('api-key-display').style.display = 'block';
+  }
+}
+
+// Intercept step 3 to build summary
+const origGoTo = goTo;
+function goTo(n) {
+  origGoTo(n);
+  if (n === 3) buildSummary();
+}
+
+function copyKey() {
+  const val = document.getElementById('api-key-val').textContent;
+  navigator.clipboard.writeText(val).then(() => {
+    document.querySelector('.copy-btn').textContent = 'Copied!';
+    setTimeout(() => document.querySelector('.copy-btn').textContent = 'Copy', 2000);
+  });
+}
+</script>
+</body>
+</html>

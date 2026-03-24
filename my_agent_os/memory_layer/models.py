@@ -47,6 +47,7 @@ class MemoryType(str, Enum):
 class MemoryStatus(str, Enum):
     ACTIVE = "active"
     SEALED = "sealed"
+    DEPRECATED = "deprecated"
 
 
 class SessionStatus(str, Enum):

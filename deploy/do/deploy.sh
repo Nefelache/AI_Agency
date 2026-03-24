@@ -54,6 +54,12 @@ if [[ ! -f my_agent_os/config/.env ]]; then
   }
 fi
 
+# Non-interactive: fill API_KEY_* if still placeholders (common after template-only deploy)
+if [[ -f scripts/ensure_api_keys.py ]]; then
+  echo "检查 API_KEY_OWNER / CHANNEL / GUEST 是否已配置…"
+  python3 scripts/ensure_api_keys.py || true
+fi
+
 # Compose .env
 if [[ ! -f .env ]]; then
   SECRET=$(grep WHATSAPP_BRIDGE_SECRET my_agent_os/config/.env 2>/dev/null | cut -d= -f2)
@@ -64,9 +70,9 @@ EOF
   echo "Created .env from config"
 fi
 
-# Start (agent-os + whatsapp-bridge only, no Caddy - safe for existing sites)
-echo "Starting agent-os + whatsapp-bridge..."
-docker compose up -d --build agent-os whatsapp-bridge
+# Start (agent-os + maintenance + whatsapp-bridge, no Caddy - safe for existing sites)
+echo "Starting agent-os + memory-maintenance + whatsapp-bridge..."
+docker compose up -d --build agent-os memory-maintenance whatsapp-bridge
 
 echo ""
 echo "Done. Check status: docker compose ps"

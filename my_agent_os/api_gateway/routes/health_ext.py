@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends
 from my_agent_os.auth.dependencies import get_auth_context
 from my_agent_os.auth.models import AuthContext
 from my_agent_os.config.settings import settings
+from my_agent_os.version import __version__ as APP_VERSION
 
 router = APIRouter()
 
@@ -38,6 +39,7 @@ async def health_extended(auth: AuthContext = Depends(get_auth_context)) -> dict
         bridge_ok = bridge_age_s < 120
 
     return {
+        "version": APP_VERSION,
         "status": "ok" if (db_ok and llm_ok and (bridge_ok is not False)) else "degraded",
         "db": {"ok": db_ok, "path": str(db_path)},
         "llm": {"ok": llm_ok, "provider": "deepseek", "model": settings.DEEPSEEK_MODEL},

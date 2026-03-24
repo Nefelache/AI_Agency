@@ -143,6 +143,10 @@ class MemoryStore:
         self._db = await aiosqlite.connect(self._db_path)
         self._db.row_factory = aiosqlite.Row
         await self._db.execute("PRAGMA journal_mode=WAL")
+        await self._db.execute("PRAGMA mmap_size=268435456")   # 256 MB mmap window — reads become pointer dereferences
+        await self._db.execute("PRAGMA cache_size=-32000")     # 32 MB page cache
+        await self._db.execute("PRAGMA synchronous=NORMAL")    # safe + fast under WAL
+        await self._db.execute("PRAGMA temp_store=MEMORY")     # temp tables in RAM
         await self._db.execute("PRAGMA foreign_keys=ON")
         await self._db.executescript(_SCHEMA)
         await self._db.executescript(_FTS_SCHEMA)

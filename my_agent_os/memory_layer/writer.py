@@ -146,6 +146,11 @@ class MemoryWriter:
         session_id: str,
         user_id: str,
     ) -> None:
+        # Truth maintenance: if a new semantic statement contradicts old state,
+        # mark older records deprecated before normal consolidation.
+        if memory_type == MemoryType.SEMANTIC:
+            await self._deprecate_conflicting_semantics(content, user_id)
+
         existing = await self._store.get_memories_by_type(user_id, memory_type, limit=20)
 
         if not existing:
@@ -186,6 +191,57 @@ class MemoryWriter:
 
         elif decision.operation == ConsolidationOp.DELETE and decision.memory_id:
             await self._store.delete_memory(decision.memory_id)
+
+    async def consolidate_episodic_memories(
+        self,
+        user_id: str,
+        lookback_days: int = 7,
+        max_items: int = 30,
+    ) -> dict[str, Any]:
+        """
+        Convert short-lived episodic fragments into one semantic memory and prune.
+        Intended for background maintenance ("sleep-time" consolidation).
+        """
+        episodic = await self._store.get_memories_by_type(user_id, MemoryType.EPISODIC, limit=max_items * 2)
+        if not episodic:
+            return {"consolidated": 0, "pruned": 0}
+
+        cutoff = utcnow().timestamp() - lookback_days * 24 * 3600
+        candidates = [
+            m for m in episodic
+            if m.updated_at.timestamp() >= cutoff and len(m.content) > 20
+        ][:max_items]
+        if len(candidates) < 3:
+            return {"consolidated": 0, "pruned": 0}
+
+        turns_text = "\n".join(f"- {m.summary or m.content[:180]}" for m in candidates)
+        summary = await self._summarize(turns_text[:5000])
+
+        semantic_content = summary.get("summary") or "\n".join(
+            kp for kp in summary.get("key_decisions", []) if isinstance(kp, str)
+        )
+        semantic_content = (semantic_content or "").strip()
+        if not semantic_content:
+            return {"consolidated": 0, "pruned": 0}
+
+        semantic = MemoryRecord(
+            memory_type=MemoryType.SEMANTIC,
+            content=semantic_content,
+            summary=summary.get("summary", semantic_content[:180]),
+            key_points=summary.get("key_decisions", []),
+            entities=self._extract_entities_simple(semantic_content),
+            user_id=user_id,
+            priority=0.65,
+        )
+        await self._store.add_memory(semantic)
+
+        # Prune low-signal episodic fragments once consolidated.
+        pruned = 0
+        for m in candidates:
+            if m.access_count <= 1 and m.priority <= 0.7:
+                await self._store.delete_memory(m.id)
+                pruned += 1
+        return {"consolidated": 1, "pruned": pruned}
 
     async def _decide_consolidation(
         self, candidate: str, existing: str
@@ -271,6 +327,54 @@ class MemoryWriter:
                     seen.add(variant)
                     entities.append(variant)
         return entities[:30]  # increased cap to accommodate variants
+
+    async def _deprecate_conflicting_semantics(self, candidate: str, user_id: str) -> int:
+        """Mark older semantic memories deprecated if they conflict with new statement."""
+        candidate_entities = set(self._extract_entities_simple(candidate))
+        if not candidate_entities:
+            return 0
+        candidate_pol = self._polarity(candidate)
+        if candidate_pol == 0:
+            return 0
+
+        existing = await self._store.get_memories_by_type(user_id, MemoryType.SEMANTIC, limit=60)
+        deprecated = 0
+        for m in existing:
+            overlap = candidate_entities.intersection(set(m.entities or []))
+            if not overlap:
+                continue
+            old_pol = self._polarity(m.content)
+            if old_pol == 0 or old_pol == candidate_pol:
+                continue
+            await self._store.update_memory(m.id, status="deprecated")
+            deprecated += 1
+        return deprecated
+
+    @staticmethod
+    def _polarity(text: str) -> int:
+        """
+        Heuristic sentiment/state polarity:
+          +1 preference/allowed/likes
+          -1 dislike/forbidden/allergy/avoid
+           0 unknown
+        """
+        t = text.lower()
+        neg_words = [
+            "dislike", "hate", "avoid", "forbid", "forbidden", "allergic",
+            "allergy", "cannot", "can't", "do not", "don't", "no ", "not ",
+            "讨厌", "不喜欢", "禁止", "过敏", "避免",
+        ]
+        pos_words = [
+            "like", "love", "prefer", "enjoy", "allowed", "can ",
+            "喜欢", "偏好", "可以",
+        ]
+        neg = sum(1 for w in neg_words if w in t)
+        pos = sum(1 for w in pos_words if w in t)
+        if neg > pos:
+            return -1
+        if pos > neg:
+            return 1
+        return 0
 
     @staticmethod
     def _parse_json(raw: str) -> dict:

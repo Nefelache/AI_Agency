@@ -20,6 +20,7 @@ from typing import Any
 
 from my_agent_os.agent_core.llm_client import call_llm
 from my_agent_os.auth.sanitizer import sanitize_output
+from my_agent_os.skills_layer.tools import get_tool, list_tools
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ _memory_engine = None
 _crew_orchestrator = None
 _PROMPTS_CACHE: dict | None = None
 
-CREW_COMPLEXITY_THRESHOLD = 0.5
+CREW_COMPLEXITY_THRESHOLD = 0.6  # Only trigger crew for genuinely complex tasks (score 4+)
 
 
 def set_memory_engine(engine) -> None:
@@ -104,6 +105,20 @@ async def route(
         complexity = await _check_complexity(raw_input)
         if complexity >= CREW_COMPLEXITY_THRESHOLD:
             return await _route_via_crew(raw_input, user_id, system_msg, user_payload_parts, channel, start_ts)
+
+    # Skill dispatch: check if the input maps to a registered skill
+    skill_result = await _try_skill_dispatch(raw_input, user_payload_parts)
+    if skill_result is not None:
+        if _memory_engine:
+            _memory_engine.process_turn_background(user_id, raw_input, skill_result.get("answer", ""))
+        latency_ms = (time.perf_counter() - start_ts) * 1000
+        try:
+            from my_agent_os.enterprise.audit import log_route
+            log_route(session_id=session_id, channel=channel, user_id=user_id,
+                      raw_input=raw_input, response=skill_result, latency_ms=round(latency_ms, 2))
+        except Exception:
+            pass
+        return skill_result
 
     # Single-agent path (whatsapp, mobile, console fallback)
     raw_response = await call_llm(
@@ -279,6 +294,62 @@ def _try_extract_json(raw: str) -> dict[str, Any] | None:
             pass
 
     return None
+
+
+async def _try_skill_dispatch(
+    raw_input: str,
+    user_payload_parts: list[str],
+) -> dict[str, Any] | None:
+    """
+    Ask the LLM to classify whether the user's request maps to a registered skill.
+    Returns a formatted response dict if a skill executes successfully, else None.
+    """
+    tools = list_tools()
+    if not tools:
+        return None
+
+    tool_list = "\n".join(f'  "{t["name"]}": {t["description"]}' for t in tools)
+    classifier_system = (
+        "You are a skill dispatcher. Given a user message, decide if it maps to one of these tools:\n"
+        + tool_list
+        + "\n\nRespond ONLY with a JSON object: "
+        '{\"skill\": \"<name or null>\", \"params\": {<extracted params>}}\n'
+        "If no skill matches, return {\"skill\": null}. Never add explanation."
+    )
+
+    try:
+        raw = await call_llm(
+            system_message=classifier_system,
+            user_message=raw_input,
+            stream=False,
+        )
+        data = _try_extract_json(raw)
+        if not data or not data.get("skill"):
+            return None
+
+        skill_name = data["skill"]
+        params     = data.get("params", {})
+
+        try:
+            tool   = get_tool(skill_name)
+            result = tool.execute(params)
+        except KeyError:
+            return None
+
+        output = result.get("output") or str(result)
+        if not result.get("success", True):
+            reason = result.get("reason", "Unknown error")
+            output = f"[{skill_name}] failed: {reason}"
+
+        return {
+            "answer":       output,
+            "sources":      None,
+            "next_actions": [],
+            "skill_used":   skill_name,
+        }
+    except Exception as e:
+        logger.debug("Skill dispatch probe failed (non-fatal): %s", e)
+        return None
 
 
 def _normalize_str_list(items: Any) -> list[str]:

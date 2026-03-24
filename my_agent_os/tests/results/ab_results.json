@@ -198,10 +198,10 @@
     ]
   },
   "C_pyramid": {
-    "accuracy_pct": 90.0,
+    "accuracy_pct": 100.0,
     "avg_context_chars": 174,
     "avg_injected_chars": 99,
-    "correct": 9,
+    "correct": 10,
     "total": 10,
     "rows": [
       {
@@ -296,11 +296,11 @@
         "fact_id": "diet",
         "question": "What is my dietary restriction?",
         "expected": "low sugar",
-        "response": "I don't have that information in my current context.",
-        "correct": false,
+        "response": "Based on your profile: low sugar.",
+        "correct": true,
         "ms": 0.0,
-        "context_chars": 229,
-        "injected_chars": 149,
+        "context_chars": 226,
+        "injected_chars": 146,
         "memories_retrieved": 3
       },
       {

@@ -31,7 +31,7 @@ Respond with ONLY a JSON object: {{"score": <1-5>, "reason": "<brief>"}}"""
 async def confidence_check(llm: LLMFunc, task: str) -> float:
     """
     Returns a 0-1 complexity score.
-    Score >= 0.6 (i.e. rating 3+) triggers multi-agent crew.
+    Score >= 0.6 (rating 4+) triggers multi-agent crew; casual chat stays single-agent.
     """
     prompt = _COMPLEXITY_PROMPT.replace("{task}", task)
     try:
