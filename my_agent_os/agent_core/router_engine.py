@@ -321,7 +321,6 @@ async def _try_skill_dispatch(
         raw = await call_llm(
             system_message=classifier_system,
             user_message=raw_input,
-            stream=False,
         )
         data = _try_extract_json(raw)
         if not data or not data.get("skill"):
