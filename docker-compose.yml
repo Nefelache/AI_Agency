@@ -66,6 +66,9 @@ services:
     environment:
       - DOMAIN=${DOMAIN}
       - AGENT_DOMAIN=${AGENT_DOMAIN}
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

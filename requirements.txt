@@ -5,6 +5,7 @@
 fastapi
 uvicorn[standard]
 pydantic-settings
+python-multipart
 
 # --- LLM ---
 httpx
