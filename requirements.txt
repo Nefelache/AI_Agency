@@ -16,6 +16,9 @@ aiosqlite
 # --- Prompt Management ---
 pyyaml
 
+# --- Video Pipeline ---
+moviepy
+
 # --- Testing ---
 pytest
 pytest-asyncio

@@ -48,6 +48,9 @@ async def lifespan(app: FastAPI):
     memory_api.set_engine(engine)
     gdpr.set_engine(engine)
 
+    from my_agent_os.skills_layer import context as skills_ctx
+    skills_ctx.set_memory_engine(engine)
+
     from my_agent_os.agent_core.router_engine import route as _route_fn
     slack.set_router(_route_fn)
 
