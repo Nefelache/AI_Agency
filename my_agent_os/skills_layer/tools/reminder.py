@@ -18,6 +18,8 @@ Params for 'list' / 'cancel':
 from __future__ import annotations
 
 import asyncio
+import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -39,7 +41,7 @@ class Reminder(Skill):
         "reminder_id (str, for cancel)."
     )
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         action = params.get("action", "set").lower()
         if action == "set":
             return self._set(params)
@@ -105,11 +107,31 @@ class Reminder(Skill):
         return {"success": True, "output": f"Reminder '{rid}' cancelled."}
 
 
+async def _push_whatsapp(message: str) -> None:
+    """Push reminder to the owner's WhatsApp number via the agent-os bridge."""
+    owner_number = os.getenv("WHATSAPP_ALLOW_FROM", "").split(",")[0].strip()
+    agent_url    = os.getenv("AGENT_OS_URL", "http://localhost:8000")
+    secret       = os.getenv("WHATSAPP_BRIDGE_SECRET", "")
+    if not owner_number:
+        return
+    try:
+        import urllib.request as _req
+        import json as _json
+        payload = _json.dumps({"to": owner_number, "message": f"⏰ Reminder: {message}"}).encode()
+        headers = {"Content-Type": "application/json"}
+        if secret:
+            headers["X-Bridge-Secret"] = secret
+        req = _req.Request(f"{agent_url}/reminder/push", data=payload, headers=headers, method="POST")
+        with _req.urlopen(req, timeout=5):
+            pass
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Reminder WhatsApp push failed: %s", exc)
+
+
 async def _fire_reminder(rid: str, message: str, delay: float, repeat_sec: int) -> None:
     await asyncio.sleep(delay)
-    # In a real deployment this would push to a notification channel.
-    import logging
     logging.getLogger(__name__).info("REMINDER [%s]: %s", rid, message)
+    await _push_whatsapp(message)
     if rid in _reminders:
         _reminders[rid]["fire_at"] = datetime.now(timezone.utc).timestamp() + max(repeat_sec, 0)
     if repeat_sec > 0:

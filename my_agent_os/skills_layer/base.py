@@ -18,6 +18,6 @@ class Skill(ABC):
     description: ClassVar[str]
 
     @abstractmethod
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         """Run the skill. Must not hold state between invocations."""
         ...

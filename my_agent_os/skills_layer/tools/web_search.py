@@ -1,6 +1,8 @@
 """
-Web Search — query DuckDuckGo Instant Answer API (no API key needed)
-or SerpAPI when SERPAPI_KEY is set in the environment.
+Web Search — real-time web search with provider priority:
+  1. Tavily  (TAVILY_API_KEY)  — best results, AI-optimised, 1000 req/mo free
+  2. SerpAPI (SERPAPI_KEY)     — Google results, 100 req/mo free
+  3. DuckDuckGo Instant Answer — zero-key fallback (limited to wiki-style results)
 """
 
 from __future__ import annotations
@@ -20,16 +22,54 @@ class WebSearch(Skill):
     name = "web_search"
     description = "Search the web for real-time information. Params: query (str), num_results (int, optional, default 5)."
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         query = params.get("query", "").strip()
         num   = int(params.get("num_results", 5))
         if not query:
             return {"success": False, "reason": "Missing 'query'."}
 
+        tavily_key  = os.getenv("TAVILY_API_KEY", "")
         serpapi_key = os.getenv("SERPAPI_KEY", "")
+        if tavily_key:
+            return self._tavily_search(query, num, tavily_key)
         if serpapi_key:
             return self._serpapi_search(query, num, serpapi_key)
         return self._ddg_search(query, num)
+
+    # ── Tavily (recommended — AI-optimised search) ───────────────
+    def _tavily_search(self, query: str, num: int, key: str) -> dict[str, Any]:
+        try:
+            payload = json.dumps({
+                "api_key": key,
+                "query": query,
+                "search_depth": "basic",
+                "max_results": num,
+                "include_answer": True,
+            }).encode()
+            req = urllib.request.Request(
+                "https://api.tavily.com/search",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode())
+
+            results = [
+                {
+                    "title":   r.get("title", ""),
+                    "snippet": r.get("content", "")[:300],
+                    "url":     r.get("url", ""),
+                }
+                for r in data.get("results", [])[:num]
+            ]
+            direct_answer = data.get("answer", "")
+            output = _format_results(query, results)
+            if direct_answer:
+                output = f"Direct answer: {direct_answer}\n\n{output}"
+            return {"success": True, "query": query, "results": results, "output": output}
+        except Exception as e:
+            return {"success": False, "reason": str(e)}
 
     # ── DuckDuckGo Instant Answer (zero-key fallback) ────────────
     def _ddg_search(self, query: str, num: int) -> dict[str, Any]:

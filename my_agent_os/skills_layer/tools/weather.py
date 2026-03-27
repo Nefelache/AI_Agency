@@ -29,7 +29,7 @@ class Weather(Skill):
     name = "weather"
     description = "Get current weather and 3-day forecast for any city. Params: city (str), units ('celsius'|'fahrenheit', optional)."
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         city  = params.get("city", "").strip()
         units = params.get("units", "celsius")
         if not city:

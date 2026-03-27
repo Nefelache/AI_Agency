@@ -55,7 +55,7 @@ class NotionSkill(Skill):
         "properties (dict, optional)."
     )
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         if not _NOTION_KEY:
             return {"success": False, "reason": "NOTION_API_KEY not set."}
 

@@ -35,7 +35,7 @@ class CodeRunner(Skill):
         "timeout (int seconds, optional, max 30)."
     )
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         code     = params.get("code", "").strip()
         language = params.get("language", "python").lower()
         timeout  = min(int(params.get("timeout", _DEFAULT_TIMEOUT)), 30)

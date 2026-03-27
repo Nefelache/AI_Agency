@@ -191,6 +191,13 @@ class MemoryEngine:
         await self._ensure_init()
         await self._store.delete_memory(memory_id)
 
+    async def get_tasks_by_status(
+        self, user_id: str, status: str
+    ) -> list[MemoryRecord]:
+        """Return all memories whose metadata['status'] matches the given value."""
+        await self._ensure_init()
+        return await self._store.get_memories_by_metadata(user_id, "status", status)
+
     async def stats(self, user_id: str) -> dict[str, Any]:
         await self._ensure_init()
         return await self._store.stats(user_id)

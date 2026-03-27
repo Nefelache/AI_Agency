@@ -40,7 +40,7 @@ class CalendarSkill(Skill):
         "days_ahead (int, for list, default 7)."
     )
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         action = params.get("action", "list").lower()
         if action in ("list", "today"):
             days = 1 if action == "today" else int(params.get("days_ahead", 7))

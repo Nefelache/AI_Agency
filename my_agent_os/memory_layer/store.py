@@ -63,7 +63,8 @@ CREATE TABLE IF NOT EXISTS memories (
     access_count    INTEGER DEFAULT 0,
     status          TEXT DEFAULT 'active',
     session_id      TEXT,
-    user_id         TEXT DEFAULT 'default'
+    user_id         TEXT DEFAULT 'default',
+    metadata        TEXT DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(user_id, memory_type, status);
@@ -165,8 +166,8 @@ class MemoryStore:
             """INSERT INTO memories
                (id, memory_type, content, summary, key_points, entities,
                 priority, created_at, updated_at, last_accessed,
-                access_count, status, session_id, user_id)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                access_count, status, session_id, user_id, metadata)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 record.id,
                 record.memory_type.value,
@@ -182,6 +183,7 @@ class MemoryStore:
                 record.status.value,
                 record.session_id,
                 record.user_id,
+                json.dumps(record.metadata, ensure_ascii=False),
             ),
         )
         await self._db.commit()
@@ -197,6 +199,8 @@ class MemoryStore:
             fields["key_points"] = json.dumps(fields["key_points"], ensure_ascii=False)
         if "entities" in fields and isinstance(fields["entities"], list):
             fields["entities"] = json.dumps(fields["entities"], ensure_ascii=False)
+        if "metadata" in fields and isinstance(fields["metadata"], dict):
+            fields["metadata"] = json.dumps(fields["metadata"], ensure_ascii=False)
 
         set_clause = ", ".join(f"{k} = ?" for k in fields)
         values = list(fields.values()) + [memory_id]
@@ -440,6 +444,25 @@ class MemoryStore:
 
         return counts
 
+    async def get_memories_by_metadata(
+        self,
+        user_id: str,
+        key: str,
+        value: str,
+        limit: int = 50,
+    ) -> list[MemoryRecord]:
+        """Filter active memories by a metadata key=value pair using SQLite json_extract."""
+        async with self._db.execute(
+            """SELECT * FROM memories
+               WHERE user_id = ? AND status = 'active'
+               AND json_extract(metadata, ?) = ?
+               ORDER BY priority DESC, updated_at DESC
+               LIMIT ?""",
+            (user_id, f"$.{key}", value, limit),
+        ) as cur:
+            rows = await cur.fetchall()
+        return [self._row_to_memory(r) for r in rows]
+
     # ── Internal Helpers ─────────────────────────────────
 
     @staticmethod
@@ -459,6 +482,7 @@ class MemoryStore:
             status=MemoryStatus(row["status"]),
             session_id=row["session_id"],
             user_id=row["user_id"],
+            metadata=json.loads(row["metadata"] or "{}"),
         )
 
     @staticmethod

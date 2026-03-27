@@ -27,7 +27,7 @@ class HttpFetch(Skill):
         "timeout (int seconds, optional)."
     )
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         url     = params.get("url", "").strip()
         method  = params.get("method", "GET").upper()
         headers = params.get("headers") or {}

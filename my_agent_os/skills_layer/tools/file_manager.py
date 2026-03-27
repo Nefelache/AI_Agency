@@ -37,7 +37,7 @@ class FileManager(Skill):
         "encoding (str, optional, default utf-8)."
     )
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         action   = params.get("action", "read").lower()
         rel_path = params.get("path", "").strip()
         content  = params.get("content", "")

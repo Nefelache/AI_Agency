@@ -43,7 +43,7 @@ class EmailHandler(Skill):
         "query (str, for search)."
     )
 
-    def execute(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         action = params.get("action", "send").lower()
         if action == "send":
             return self._send(params)

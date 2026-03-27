@@ -24,6 +24,9 @@ my_agent_os/memory_layer/vector_db/chroma_data/
 .idea/
 *.swp
 
+# Stress test artifacts (optional: remove this line to commit reports)
+stress/results/
+
 # OS
 .DS_Store
 Thumbs.db

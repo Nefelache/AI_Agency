@@ -32,6 +32,8 @@ async def call_llm(
     system_message: str,
     user_message: str,
     response_json: bool = False,
+    temperature: float = 0.7,
+    max_tokens: int = 2048,
 ) -> str:
     """
     Unified LLM call via DeepSeek API.
@@ -41,7 +43,9 @@ async def call_llm(
     last_err = None
     for attempt in range(LLM_RETRY_ATTEMPTS):
         try:
-            return await _call_deepseek(system_message, user_message, response_json)
+            return await _call_deepseek(
+                system_message, user_message, response_json, temperature, max_tokens
+            )
         except Exception as e:
             last_err = e
             logger.warning("DeepSeek attempt %d/%d failed: %s", attempt + 1, LLM_RETRY_ATTEMPTS, e)
@@ -59,6 +63,8 @@ async def _call_deepseek(
     system_message: str,
     user_message: str,
     response_json: bool,
+    temperature: float = 0.7,
+    max_tokens: int = 2048,
 ) -> str:
     url = f"{settings.DEEPSEEK_BASE_URL}/v1/chat/completions"
     headers = {
@@ -72,8 +78,8 @@ async def _call_deepseek(
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message},
         ],
-        "temperature": 0.7,
-        "max_tokens": 2048,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
     }
     if response_json:
         payload["response_format"] = {"type": "json_object"}

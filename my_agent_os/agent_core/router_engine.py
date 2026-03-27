@@ -108,6 +108,8 @@ async def route(
 
     # Skill dispatch: check if the input maps to a registered skill
     skill_result = await _try_skill_dispatch(raw_input, user_payload_parts)
+    if skill_result is None and await _detect_skill_gap(raw_input):
+        logger.info("SKILL_GAP detected: %.80s", raw_input)
     if skill_result is not None:
         if _memory_engine:
             _memory_engine.process_turn_background(user_id, raw_input, skill_result.get("answer", ""))
@@ -317,10 +319,13 @@ async def _try_skill_dispatch(
         "If no skill matches, return {\"skill\": null}. Never add explanation."
     )
 
+    skill_name: str | None = None
     try:
         raw = await call_llm(
             system_message=classifier_system,
             user_message=raw_input,
+            response_json=True,
+            temperature=0.1,
         )
         data = _try_extract_json(raw)
         if not data or not data.get("skill"):
@@ -331,7 +336,7 @@ async def _try_skill_dispatch(
 
         try:
             tool   = get_tool(skill_name)
-            result = tool.execute(params)
+            result = await tool.execute(params)
         except KeyError:
             return None
 
@@ -346,9 +351,33 @@ async def _try_skill_dispatch(
             "next_actions": [],
             "skill_used":   skill_name,
         }
-    except Exception as e:
-        logger.debug("Skill dispatch probe failed (non-fatal): %s", e)
+    except KeyError:
         return None
+    except Exception as e:
+        if skill_name:
+            logger.warning("Skill execution error [%s]: %s", skill_name, e)
+            return {
+                "answer":       f"I found the right skill ({skill_name}) but ran into an error: {e}",
+                "sources":      None,
+                "next_actions": ["Try rephrasing", "Check skill configuration"],
+                "skill_used":   skill_name,
+                "skill_error":  True,
+            }
+        logger.debug("Skill dispatch classification failed (non-fatal): %s", e)
+        return None
+
+
+_ACTION_KEYWORDS = {
+    "search", "find", "get", "fetch", "create", "generate", "send", "write",
+    "calculate", "convert", "check", "download", "weather", "remind", "email",
+    "搜索", "查找", "生成", "创建", "发送", "计算", "转换", "查天气", "提醒",
+}
+
+
+async def _detect_skill_gap(raw_input: str) -> bool:
+    """Return True if the input looks like it needs a tool but none matched."""
+    lowered = raw_input.lower()
+    return any(kw in lowered for kw in _ACTION_KEYWORDS)
 
 
 def _normalize_str_list(items: Any) -> list[str]:

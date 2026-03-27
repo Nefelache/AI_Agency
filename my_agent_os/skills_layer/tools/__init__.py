@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -41,6 +42,16 @@ def list_tools() -> list[dict]:
         {"name": name, "description": getattr(cls, "description", "")}
         for name, cls in sorted(_registry.items())
     ]
+
+
+def reload_tool(name: str) -> None:
+    """Force re-import a skill module by stem name (used by skill_writer after writing a new file)."""
+    module_name = f"my_agent_os.skills_layer.tools.{name}"
+    if module_name in sys.modules:
+        importlib.reload(sys.modules[module_name])
+    else:
+        importlib.import_module(module_name)
+    logger.info("Reloaded skill module: %s", module_name)
 
 
 _loaded = False

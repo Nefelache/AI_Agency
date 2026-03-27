@@ -1,0 +1,97 @@
+{
+  "timestamp": "2026-03-24T07:44:21Z",
+  "config": {
+    "base_url": "http://127.0.0.1:8000",
+    "total_get_requests_per_phase": 800,
+    "workers": 16,
+    "api_key_set": false
+  },
+  "results": [
+    {
+      "endpoint": "GET /health",
+      "method": "GET",
+      "total": 800,
+      "success": 800,
+      "errors": 0,
+      "error_rate_pct": 0.0,
+      "throughput_rps": 4942.89,
+      "latency_ms": {
+        "p50": 2.7221660002396675,
+        "p90": 4.428375001225504,
+        "p95": 5.038666999098496,
+        "p99": 6.80770799954189,
+        "min": 0.3449159994488582,
+        "max": 9.270500000639004,
+        "mean": 2.940362078754788
+      },
+      "duration_sec": 0.162
+    },
+    {
+      "endpoint": "GET /billing/plans",
+      "method": "GET",
+      "total": 800,
+      "success": 800,
+      "errors": 0,
+      "error_rate_pct": 0.0,
+      "throughput_rps": 5215.36,
+      "latency_ms": {
+        "p50": 2.6825420009117806,
+        "p90": 4.222208001010586,
+        "p95": 4.751291999127716,
+        "p99": 5.979290999675868,
+        "min": 0.39379100053338334,
+        "max": 7.147750000513042,
+        "mean": 2.8018169862593822
+      },
+      "duration_sec": 0.153
+    },
+    {
+      "endpoint": "GET /",
+      "method": "GET",
+      "total": 800,
+      "success": 800,
+      "errors": 0,
+      "error_rate_pct": 0.0,
+      "throughput_rps": 2475.65,
+      "latency_ms": {
+        "p50": 5.7585419999668375,
+        "p90": 7.695124999372638,
+        "p95": 8.447500000329455,
+        "p99": 27.255334000074072,
+        "min": 1.004417001240654,
+        "max": 29.510374999517808,
+        "mean": 6.251739588749388
+      },
+      "duration_sec": 0.323
+    },
+    {
+      "endpoint": "GET /memory/stats",
+      "skipped": true,
+      "note": "API_KEY_OWNER not set"
+    },
+    {
+      "endpoint": "GET /memory/list",
+      "skipped": true,
+      "note": "API_KEY_OWNER not set"
+    },
+    {
+      "endpoint": "POST /auth/register",
+      "method": "POST",
+      "total": 20,
+      "success": 20,
+      "errors": 0,
+      "error_rate_pct": 0.0,
+      "throughput_rps": 65.05,
+      "latency_ms": {
+        "p50": 12.902958000267972,
+        "p90": 21.04529099960928,
+        "p95": 52.16962499980582,
+        "p99": 52.16962499980582,
+        "min": 12.565584000185481,
+        "max": 52.16962499980582,
+        "mean": 15.316608350076422
+      },
+      "duration_sec": 0.307
+    }
+  ]
+}

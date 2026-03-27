@@ -79,6 +79,7 @@ class MemoryRecord(BaseModel):
     status: MemoryStatus = MemoryStatus.ACTIVE
     session_id: str | None = None
     user_id: str = "default"
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class Session(BaseModel):
