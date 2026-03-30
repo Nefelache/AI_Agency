@@ -79,7 +79,8 @@ When linked, send a DM to that WhatsApp account. Messages will be routed to Agen
 
 ## 6. Access the console
 
-- `https://your.domain.com/` (static UI)
+- `https://your.domain.com/` (Agent OS chat terminal)
+- `https://your.domain.com/openclaw/` (operations console — WebSocket + token; see [docs/CONTROL_CONSOLE.md](../docs/CONTROL_CONSOLE.md))
 - `https://your.domain.com/docs` (FastAPI docs)
 
 All API routes require API keys via `X-API-Key` or `Authorization: Bearer ...`.

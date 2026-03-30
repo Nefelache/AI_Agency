@@ -20,4 +20,5 @@ pnpm install
 pnpm run build
 
 rsync -a --delete "$ROOT/third_party/openclaw/dist/control-ui/" "$DEST/"
+python3 "$ROOT/scripts/rebrand_openclaw_static.py" --dir "$DEST"
 echo "Control UI -> $DEST ($(du -sh "$DEST" | cut -f1))"
