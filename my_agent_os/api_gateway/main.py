@@ -13,14 +13,18 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.websockets import WebSocket
 
+from my_agent_os.api_gateway.openclaw_compat import handle_openclaw_gateway_ws
 from my_agent_os.api_gateway.routes import mobile_webhook, web_terminal, memory_api, whatsapp, health_ext, audit_api
 from my_agent_os.api_gateway.routes import auth_routes, billing, gdpr, voice, slack
 from my_agent_os.config.settings import settings
 from my_agent_os.version import __version__ as APP_VERSION
 
 _STATIC_DIR = Path(__file__).parent / "static"
+_OPENCLAW_STATIC = _STATIC_DIR / "openclaw"
 
 
 @asynccontextmanager
@@ -89,6 +93,36 @@ app.include_router(billing.router)
 app.include_router(gdpr.router)
 app.include_router(voice.router)
 app.include_router(slack.router)
+
+
+@app.get("/openclaw/__openclaw/control-ui-config.json")
+async def openclaw_control_ui_bootstrap():
+    """Bootstrap for official OpenClaw Control UI static app (assistant label + base path)."""
+    return {
+        "basePath": "/openclaw",
+        "assistantName": "Agent OS",
+        "assistantAvatar": "",
+        "assistantAgentId": "agent-os",
+        "serverVersion": APP_VERSION,
+    }
+
+
+@app.get("/openclaw")
+async def openclaw_redirect_trailing():
+    return RedirectResponse("/openclaw/", status_code=302)
+
+
+@app.websocket("/openclaw")
+async def openclaw_gateway_ws(websocket: WebSocket):
+    await handle_openclaw_gateway_ws(websocket)
+
+
+if _OPENCLAW_STATIC.is_dir():
+    app.mount(
+        "/openclaw",
+        StaticFiles(directory=str(_OPENCLAW_STATIC), html=True),
+        name="openclaw_control_ui",
+    )
 
 
 @app.get("/")

@@ -24,6 +24,9 @@ my_agent_os/memory_layer/vector_db/chroma_data/
 .idea/
 *.swp
 
+# Upstream OpenClaw clone for local Control UI builds only (see scripts/build_openclaw_control_ui.sh)
+third_party/
+
 # Stress test artifacts (optional: remove this line to commit reports)
 stress/results/
 

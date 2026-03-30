@@ -24,7 +24,11 @@ class Settings(BaseSettings):
     # --- Server ---
     HOST: str = "127.0.0.1"
     PORT: int = 8000
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:8000", "http://localhost:8000"]
+
+    # --- OpenClaw Control UI (compat WebSocket at /openclaw) ---
+    # When set, Control UI must use the same token in Settings. When empty, only loopback WS connects allowed.
+    OPENCLAW_GATEWAY_TOKEN: str = ""
 
     # --- LLM: DeepSeek ---
     DEEPSEEK_API_KEY: str = ""

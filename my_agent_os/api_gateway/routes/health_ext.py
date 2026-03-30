@@ -24,6 +24,11 @@ router = APIRouter()
 _bridge_last_seen: float | None = None
 
 
+def get_whatsapp_bridge_last_seen() -> float | None:
+    """Unix time of last POST /health/whatsapp from the Baileys bridge, if any."""
+    return _bridge_last_seen
+
+
 @router.get("/health/extended")
 async def health_extended(auth: AuthContext = Depends(get_auth_context)) -> dict:
     # DB check: ensure the sqlite file is reachable (no query, just stat + parent dir)
