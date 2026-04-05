@@ -12,7 +12,7 @@
         "expected": "Alex",
         "response": "I don't have that information in my current context.",
         "correct": false,
-        "ms": 0.1,
+        "ms": 0.0,
         "context_chars": 49
       },
       {
@@ -111,7 +111,7 @@
         "expected": "Alex",
         "response": "Based on your profile: Alex.",
         "correct": true,
-        "ms": 0.4,
+        "ms": 0.0,
         "context_chars": 502
       },
       {
@@ -243,7 +243,7 @@
         "expected": "OsliceInspiration",
         "response": "Based on your profile: OsliceInspiration.",
         "correct": true,
-        "ms": 0.1,
+        "ms": 0.0,
         "context_chars": 222,
         "injected_chars": 149,
         "memories_retrieved": 3

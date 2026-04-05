@@ -62,7 +62,7 @@ _loaded = False
 
 
 def _ensure_loaded() -> None:
-    """Import every *.py module in this package exactly once."""
+    """Import every *.py module in this package exactly once, then load external SKILL.md plugins."""
     global _loaded
     if _loaded:
         return
@@ -76,6 +76,25 @@ def _ensure_loaded() -> None:
             importlib.import_module(module_name)
         except Exception as exc:
             logger.warning("Skill auto-load failed for %s: %s", module_name, exc)
+
+    # 加载外部 SKILL.md 插件（~/.coreclaw/skills/）
+    _load_external_skill_packs()
+
+
+def _load_external_skill_packs() -> None:
+    """从 ~/.coreclaw/skills/ 扫描并注册外部 SKILL.md 技能包。"""
+    try:
+        from my_agent_os.config.local_config import get_local_config
+        from my_agent_os.skills_layer.skill_loader import discover_external_skills
+
+        skills_dir = get_local_config().skills_dir
+        packs = discover_external_skills(skills_dir)
+        for skill in packs:
+            if skill.name not in _registry:
+                _registry[skill.name] = type(skill)
+                logger.info("外部技能已注册: %s", skill.name)
+    except Exception as exc:
+        logger.debug("外部 SKILL.md 插件加载跳过: %s", exc)
 
 
 # Eagerly load on import so that skills are always available

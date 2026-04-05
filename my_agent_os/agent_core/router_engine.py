@@ -28,6 +28,7 @@ _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 _memory_engine = None
 _crew_orchestrator = None
+_lane_queue = None
 _PROMPTS_CACHE: dict | None = None
 
 CREW_COMPLEXITY_THRESHOLD = 0.6  # Only trigger crew for genuinely complex tasks (score 4+)
@@ -41,6 +42,11 @@ def set_memory_engine(engine) -> None:
 def set_crew_orchestrator(orchestrator) -> None:
     global _crew_orchestrator
     _crew_orchestrator = orchestrator
+
+
+def set_lane_queue(queue) -> None:
+    global _lane_queue
+    _lane_queue = queue
 
 
 def _load_prompts(filename: str = "system_prompts.yaml") -> dict:
@@ -217,10 +223,20 @@ async def route(
             return await _route_via_crew(raw_input, user_id, system_msg, user_payload_parts, channel, start_ts)
 
     # Single-agent path: main LLM decides skill_call + answer in one pass (OpenClaw-style)
-    raw_response = await call_llm(
-        system_message=system_msg,
-        user_message="\n".join(user_payload_parts),
-    )
+    # 通过 LaneQueue 保证同一用户的请求串行执行（若已注册）
+    if _lane_queue is not None:
+        lane = f"user:{user_id}"
+        raw_response = await _lane_queue.submit(
+            lane,
+            call_llm,
+            system_message=system_msg,
+            user_message="\n".join(user_payload_parts),
+        )
+    else:
+        raw_response = await call_llm(
+            system_message=system_msg,
+            user_message="\n".join(user_payload_parts),
+        )
     parsed = _parse_response(raw_response, channel)
     parsed = await _apply_skill_from_parsed(parsed, channel)
     parsed = _sanitize_parsed(parsed, channel)

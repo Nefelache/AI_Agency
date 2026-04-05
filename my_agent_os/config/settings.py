@@ -55,6 +55,17 @@ class Settings(BaseSettings):
     AUDIT_ENABLED: bool = True
     AUDIT_RETENTION_DAYS: int = 90
 
+    # --- Multi-model LLM (OpenClaw-style provider abstraction) ---
+    # Provider: deepseek | openai | anthropic | gemini | ollama
+    LLM_PROVIDER: str = "deepseek"
+    LLM_MODEL: str = ""             # 空 → 使用各 provider 默认模型
+    OPENAI_API_KEY: str = ""
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    ANTHROPIC_API_KEY: str = ""
+    ANTHROPIC_BASE_URL: str = "https://api.anthropic.com"
+    GEMINI_API_KEY: str = ""
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+
     # --- Network Proxy (for regions with restricted access) ---
     HTTPS_PROXY: str = ""
 

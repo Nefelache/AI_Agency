@@ -28,13 +28,19 @@ _STATIC_DIR = Path(__file__).parent / "static"
 _OPENCLAW_STATIC = _STATIC_DIR / "openclaw"
 
 
+def _local_cfg():
+    from my_agent_os.config.local_config import get_local_config
+    return get_local_config()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: initialize memory engine. Shutdown: close it."""
     from my_agent_os.agent_core.llm_client import call_llm
-    from my_agent_os.agent_core.router_engine import set_memory_engine, set_crew_orchestrator
+    from my_agent_os.agent_core.router_engine import set_memory_engine, set_crew_orchestrator, set_lane_queue
     from my_agent_os.memory_layer.engine import MemoryEngine
     from my_agent_os.agent_core.crew.orchestrator import CrewOrchestrator
+    from my_agent_os.agent_core.lane_queue import LaneQueue
     from my_agent_os.enterprise.audit import prune_retention
 
     engine = MemoryEngine(
@@ -43,13 +49,19 @@ async def lifespan(app: FastAPI):
         top_k=settings.MEMORY_RETRIEVAL_TOP_K,
         decay_days=settings.MEMORY_PRIORITY_DECAY_DAYS,
         max_injection_chars=settings.MEMORY_MAX_INJECTION_CHARS,
+        memory_md_path=_local_cfg().memory_md_path if _local_cfg().memory_md_enabled else None,
+        sessions_dir=_local_cfg().sessions_dir,
+        context_window_tokens=_local_cfg().context_window_tokens,
+        compaction_threshold=_local_cfg().compaction_threshold,
     )
     await engine.initialize()
 
     crew = CrewOrchestrator(llm=call_llm)
+    lane_queue = LaneQueue()
 
     set_memory_engine(engine)
     set_crew_orchestrator(crew)
+    set_lane_queue(lane_queue)
     memory_api.set_engine(engine)
     gdpr.set_engine(engine)
 
@@ -68,6 +80,9 @@ async def lifespan(app: FastAPI):
     yield
 
     await engine.close()
+    await lane_queue.close()
+    from my_agent_os.agent_core.router_engine import set_lane_queue as _slq
+    _slq(None)
 
 
 app = FastAPI(

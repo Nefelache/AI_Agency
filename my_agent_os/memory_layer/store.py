@@ -29,6 +29,7 @@ from my_agent_os.memory_layer.models import (
     entity_hash,
     utcnow,
 )
+from my_agent_os.memory_layer import embeddings as _emb
 
 logger = logging.getLogger(__name__)
 
@@ -152,8 +153,9 @@ class MemoryStore:
         await self._db.executescript(_SCHEMA)
         await self._db.executescript(_FTS_SCHEMA)
         await self._db.executescript(_FTS_TRIGGERS)
+        await self._db.executescript(_emb.EMBEDDINGS_SCHEMA)
         await self._db.commit()
-        logger.info("MemoryStore initialized (SQLite + FTS5): %s", self._db_path)
+        logger.info("MemoryStore initialized (SQLite + FTS5 + L4 embeddings): %s", self._db_path)
 
     async def close(self) -> None:
         if self._db:
@@ -462,6 +464,54 @@ class MemoryStore:
         ) as cur:
             rows = await cur.fetchall()
         return [self._row_to_memory(r) for r in rows]
+
+    # ── L4 Embedding Index ────────────────────────────────
+
+    async def store_embedding(self, memory_id: str, text: str) -> None:
+        """将文本编码并存入 memory_embeddings 表（L4 语义搜索索引）。"""
+        blob = _emb.encode(text)
+        await self._db.execute(
+            "INSERT OR REPLACE INTO memory_embeddings (memory_id, embedding) VALUES (?, ?)",
+            (memory_id, blob),
+        )
+        await self._db.commit()
+
+    async def semantic_search(
+        self,
+        query: str,
+        top_k: int = 10,
+        user_id: str | None = None,
+    ) -> list[tuple[str, float]]:
+        """
+        L4 语义向量搜索。
+        加载全部嵌入向量到 Python 内存，计算余弦相似度，返回 Top-K。
+        适用规模: < 50k 条记忆（单用户场景绰绰有余）。
+        """
+        sql = """
+            SELECT e.memory_id, e.embedding
+            FROM memory_embeddings e
+            JOIN memories m ON m.id = e.memory_id
+            WHERE m.status = 'active'
+        """
+        params: list[Any] = []
+        if user_id:
+            sql += " AND m.user_id = ?"
+            params.append(user_id)
+
+        try:
+            async with self._db.execute(sql, params) as cur:
+                rows = await cur.fetchall()
+        except Exception as exc:
+            logger.warning("L4 semantic_search 查询失败: %s", exc)
+            return []
+
+        scored: list[tuple[str, float]] = []
+        for row in rows:
+            score = _emb.similarity_score(query, row["embedding"])
+            scored.append((row["memory_id"], score))
+
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return scored[:top_k]
 
     # ── Internal Helpers ─────────────────────────────────
 
