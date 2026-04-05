@@ -51,7 +51,52 @@ def _load_prompts(filename: str = "system_prompts.yaml") -> dict:
     return _PROMPTS_CACHE
 
 
+def _build_openclaw_system_message(prompts: dict) -> str:
+    """
+    OpenClaw Control UI channel: use an OpenClaw-shaped prompt pack instead of the
+    executive-assistant + hidden-internals stack (which makes the model sound dull
+    and triggers generic refusals). Structure follows OpenClaw's documented sections,
+    adapted for Agent OS (Python router, skills, memory engine)—not the Node gateway.
+    """
+    keys = (
+        "openclaw_core",
+        "openclaw_safety",
+        "openclaw_memory_recall",
+        "openclaw_skills",
+        "openclaw_tool_style",
+        "openclaw_workspace",
+        "openclaw_docs",
+        "channel_openclaw",
+    )
+    blocks: list[str] = []
+    for k in keys:
+        block = prompts.get(k)
+        if isinstance(block, str) and block.strip():
+            blocks.append(block.strip())
+    return "\n\n".join(blocks)
+
+
+def _append_openclaw_skill_catalog(system_message: str) -> str:
+    """Inject live skill registry (OpenClaw-style tooling section, Agent OS reality)."""
+    from my_agent_os.skills_layer.tools import list_tools
+
+    tools = list_tools()
+    lines = [
+        "## Registered skills (Agent OS)",
+        "Host router may auto-dispatch when intent matches. You reason with the user using natural language; execution goes through these capabilities.",
+    ]
+    for t in tools:
+        name = t.get("name", "?")
+        desc = (t.get("description") or "").strip().replace("\n", " ")
+        if len(desc) > 300:
+            desc = desc[:297] + "..."
+        lines.append(f"- **{name}**: {desc}")
+    return system_message + "\n\n" + "\n".join(lines)
+
+
 def _build_system_message(prompts: dict, channel: str) -> str:
+    if channel == "openclaw":
+        return _build_openclaw_system_message(prompts)
     parts = [
         prompts["core_identity"],
         prompts["control_aesthetic"],
@@ -79,6 +124,8 @@ async def route(
 
     prompts = _load_prompts()
     system_msg = _build_system_message(prompts, channel)
+    if channel == "openclaw":
+        system_msg = _append_openclaw_skill_catalog(system_msg)
     preferences = prompts.get("preferences", {})
 
     user_payload_parts = [raw_input]
