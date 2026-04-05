@@ -215,3 +215,38 @@ async def test_websocket_chat_send_mocked(api_client: TestClient, openclaw_token
         payload = evt["payload"]
         assert payload["state"] == "final"
         assert "mocked-reply" in json.dumps(payload)
+
+
+def test_websocket_accepts_owner_api_key_when_no_dedicated_ws_token(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """/openclaw WS auth.token may match API_KEY_OWNER when OPENCLAW_GATEWAY_TOKEN is unset."""
+    import my_agent_os.config.settings as cfg
+
+    unified = "pytest-unified-ws-via-owner-key"
+    monkeypatch.setattr(cfg.settings, "DEV_DISABLE_TOKEN_AUTH", False)
+    monkeypatch.setattr(cfg.settings, "OPENCLAW_GATEWAY_TOKEN", "")
+    monkeypatch.setattr(cfg.settings, "API_KEY_OWNER", unified)
+
+    import my_agent_os.api_gateway.openclaw_compat.gateway_ws as gw
+
+    gw._session_histories.clear()
+    try:
+        from my_agent_os.api_gateway.main import app
+
+        with TestClient(app) as client:
+            with client.websocket_connect("/openclaw") as ws:
+                assert ws.receive_json()["event"] == "connect.challenge"
+                ws.send_json(
+                    {
+                        "type": "req",
+                        "id": "c-u",
+                        "method": "connect",
+                        "params": _connect_params(unified),
+                    }
+                )
+                msg = ws.receive_json()
+                assert msg["ok"] is True
+                assert msg["payload"]["type"] == "hello-ok"
+    finally:
+        gw._session_histories.clear()

@@ -16,6 +16,7 @@ router = APIRouter(dependencies=[Depends(rate_limit_check)])
 
 class ConsoleQuery(BaseModel):
     query: str = Field(..., description="Free-form deep query from the web console")
+    session_key: str | None = Field(None, description="Named session key (e.g. 'main') for isolation")
     include_memory: bool = Field(True, description="Pull related docs from memory_layer")
     force_crew: bool = Field(False, description="Force multi-agent crew (show Department Views)")
 
@@ -34,10 +35,11 @@ async def handle_console(
 ):
     from my_agent_os.agent_core.router_engine import route
 
+    user_id = f"console:{q.session_key}" if q.session_key else auth.user_id
     result = await route(
         raw_input=q.query,
         channel="console",
-        user_id=auth.user_id,
+        user_id=user_id,
         with_memory=q.include_memory,
         force_crew=q.force_crew,
     )

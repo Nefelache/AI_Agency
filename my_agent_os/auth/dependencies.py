@@ -44,6 +44,22 @@ async def get_auth_context(
     if not key and authorization and authorization.startswith("Bearer "):
         key = authorization[7:].strip()
 
+    if settings.DEV_DISABLE_TOKEN_AUTH:
+        if key:
+            table = _build_key_table()
+            entry = table.get(key)
+            if entry:
+                return AuthContext(
+                    user_id=entry["user_id"],
+                    role=entry["role"],
+                    api_key_id=key[:8] + "...",
+                )
+        return AuthContext(
+            user_id="dev_unauthenticated",
+            role=Role.OWNER,
+            api_key_id="(dev auth off)",
+        )
+
     if not key:
         raise HTTPException(401, "Missing API key. Send X-API-Key header.")
 

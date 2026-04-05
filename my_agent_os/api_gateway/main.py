@@ -19,7 +19,7 @@ from starlette.websockets import WebSocket
 
 from my_agent_os.api_gateway.openclaw_compat import handle_openclaw_gateway_ws
 from my_agent_os.api_gateway.routes import mobile_webhook, web_terminal, memory_api, whatsapp, health_ext, audit_api
-from my_agent_os.api_gateway.routes import auth_routes, billing, gdpr, voice, slack
+from my_agent_os.api_gateway.routes import auth_routes, billing, gdpr, voice, slack, admin_routes
 from my_agent_os.config.settings import settings
 from my_agent_os.version import __version__ as APP_VERSION
 
@@ -93,6 +93,7 @@ app.include_router(billing.router)
 app.include_router(gdpr.router)
 app.include_router(voice.router)
 app.include_router(slack.router)
+app.include_router(admin_routes.router)
 
 
 @app.get("/openclaw/__openclaw/control-ui-config.json")
@@ -127,6 +128,12 @@ if _OPENCLAW_STATIC.is_dir():
 
 @app.get("/")
 async def index():
+    return FileResponse(_STATIC_DIR / "index.html")
+
+
+@app.get("/chat")
+async def chat_route():
+    """Serve the main chat UI for /chat?session=<key> deep-links."""
     return FileResponse(_STATIC_DIR / "index.html")
 
 

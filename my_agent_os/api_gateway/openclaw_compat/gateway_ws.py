@@ -39,6 +39,25 @@ def _client_looped(host: str | None) -> bool:
     return h in ("127.0.0.1", "::1", "localhost") or h.startswith("127.")
 
 
+def openclaw_ws_valid_tokens() -> frozenset[str]:
+    """
+    Secrets accepted on the /openclaw WebSocket connect (auth.token).
+    Same values as HTTP API keys, plus optional OPENCLAW_GATEWAY_TOKEN, so
+    API_KEY_OWNER alone is enough for both the web UI and OpenClaw Control UI.
+    """
+    acc: set[str] = set()
+    for raw in (
+        settings.OPENCLAW_GATEWAY_TOKEN,
+        settings.API_KEY_OWNER,
+        settings.API_KEY_CHANNEL,
+        settings.API_KEY_GUEST,
+    ):
+        t = (raw or "").strip()
+        if t:
+            acc.add(t)
+    return frozenset(acc)
+
+
 def _err(code: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
     e: dict[str, Any] = {"code": code, "message": message}
     if details:
@@ -47,7 +66,9 @@ def _err(code: str, message: str, details: dict[str, Any] | None = None) -> dict
 
 
 def _snapshot() -> dict[str, Any]:
-    token = (settings.OPENCLAW_GATEWAY_TOKEN or "").strip()
+    auth_mode = "none"
+    if not settings.DEV_DISABLE_TOKEN_AUTH:
+        auth_mode = "token" if openclaw_ws_valid_tokens() else "none"
     return {
         "presence": snapshots.build_system_presence(),
         "health": {},
@@ -61,7 +82,7 @@ def _snapshot() -> dict[str, Any]:
             "mainSessionKey": "main",
             "scope": "per-sender",
         },
-        "authMode": "token" if token else "none",
+        "authMode": auth_mode,
     }
 
 
@@ -89,12 +110,14 @@ def _validate_connect(params: dict[str, Any] | None) -> bool:
 
 
 def _auth_ok(params: dict[str, Any], client_host: str | None) -> bool:
-    token = (settings.OPENCLAW_GATEWAY_TOKEN or "").strip()
+    if settings.DEV_DISABLE_TOKEN_AUTH:
+        return True
     auth = params.get("auth") if isinstance(params.get("auth"), dict) else {}
     req_t = auth.get("token")
     req_token = req_t.strip() if isinstance(req_t, str) else ""
-    if token:
-        return req_token == token
+    allowed = openclaw_ws_valid_tokens()
+    if allowed:
+        return req_token in allowed
     return _client_looped(client_host)
 
 

@@ -466,8 +466,20 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 // ── State ─────────────────────────────────────────
 const STORAGE_KEY = 'agentos_sessions';
 let sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-let activeSessionId = null;
-let activeMessages = [];  // [{role, content, actions, crewViews}]
+let activeSessionId  = null;
+let activeSessionKey = null;   // human-readable key, e.g. "main"
+let activeMessages   = [];     // [{role, content, actions, crewViews}]
+
+// ── URL helpers ───────────────────────────────────
+function getUrlSessionKey() {
+  return new URLSearchParams(location.search).get('session') || null;
+}
+function setUrlSession(key) {
+  if (!key) return;
+  const u = new URL(location.href);
+  u.searchParams.set('session', key);
+  history.replaceState({}, '', u.toString());
+}
 
 // ── DOM refs ──────────────────────────────────────
 const messagesEl  = document.getElementById('messages');
@@ -496,14 +508,19 @@ function setAuth(ok) {
 }
 
 // ── Session management ────────────────────────────
-function newChat() {
+function newChat(sessionKey) {
   if (activeMessages.length > 0) saveSession();
-  activeSessionId = Date.now().toString();
-  activeMessages = [];
+  const id  = Date.now().toString();
+  const key = sessionKey || id;
+  activeSessionId  = id;
+  activeSessionKey = key;
+  activeMessages   = [];
   messagesEl.innerHTML = '';
   messagesEl.appendChild(welcomeEl);
   welcomeEl.style.display = 'flex';
-  document.getElementById('chat-title').textContent = 'Agent OS';
+  const displayTitle = (key !== id) ? key : 'Agent OS';
+  document.getElementById('chat-title').textContent = displayTitle;
+  setUrlSession(key);
   renderSessionList();
 }
 
@@ -511,7 +528,7 @@ function saveSession() {
   if (!activeSessionId || activeMessages.length === 0) return;
   const idx = sessions.findIndex(s => s.id === activeSessionId);
   const preview = activeMessages[0]?.content?.slice(0, 50) || 'New chat';
-  const item = { id: activeSessionId, preview, ts: Date.now(), messages: activeMessages };
+  const item = { id: activeSessionId, key: activeSessionKey || activeSessionId, preview, ts: Date.now(), messages: activeMessages };
   if (idx >= 0) sessions[idx] = item;
   else sessions.unshift(item);
   if (sessions.length > 40) sessions = sessions.slice(0, 40);
@@ -523,12 +540,15 @@ function loadSession(id) {
   if (activeMessages.length > 0) saveSession();
   const s = sessions.find(x => x.id === id);
   if (!s) return;
-  activeSessionId = id;
-  activeMessages = s.messages || [];
+  activeSessionId  = id;
+  activeSessionKey = s.key || id;
+  activeMessages   = s.messages || [];
   messagesEl.innerHTML = '';
   welcomeEl.style.display = 'none';
   activeMessages.forEach(m => _renderMsg(m.role, m.content, m.actions, m.crewViews));
-  document.getElementById('chat-title').textContent = s.preview || 'Agent OS';
+  const displayTitle = (s.key && s.key !== s.id) ? s.key : (s.preview || 'Agent OS');
+  document.getElementById('chat-title').textContent = displayTitle;
+  setUrlSession(activeSessionKey);
   renderSessionList();
 }
 
@@ -538,17 +558,35 @@ function renderSessionList() {
     const el = document.createElement('div');
     el.className = 'session-item' + (s.id === activeSessionId ? ' active' : '');
     const d = new Date(s.ts);
-    el.innerHTML = `<div>${esc(s.preview)}</div><div class="s-date">${d.toLocaleDateString()}</div>`;
+    const isNamed = s.key && s.key !== s.id;
+    const keyTag  = isNamed
+      ? `<div style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-bottom:2px;letter-spacing:.3px">#${esc(s.key)}</div>`
+      : '';
+    el.innerHTML = `${keyTag}<div>${esc(s.preview)}</div><div class="s-date">${d.toLocaleDateString()}</div>`;
     el.onclick = () => loadSession(s.id);
     sessionList.appendChild(el);
   });
 }
 
-// Initialise a default session
-if (!activeSessionId) {
-  activeSessionId = Date.now().toString();
-  if (sessions.length > 0) {
+// Initialise — honour ?session=<key> URL param (openclaw-style deep-link)
+{
+  const _urlKey = getUrlSessionKey();
+  if (_urlKey) {
+    const found = sessions.find(s => (s.key || s.id) === _urlKey);
+    if (found) {
+      loadSession(found.id);
+    } else {
+      // create a new named session on-the-fly
+      activeSessionId  = Date.now().toString();
+      activeSessionKey = _urlKey;
+      setUrlSession(_urlKey);
+    }
+  } else if (sessions.length > 0) {
     loadSession(sessions[0].id);
+  } else {
+    activeSessionId  = Date.now().toString();
+    activeSessionKey = activeSessionId;
+    setUrlSession(activeSessionKey);
   }
 }
 renderSessionList();
@@ -732,6 +770,7 @@ async function send() {
       headers: apiHeaders(),
       body: JSON.stringify({
         query: text,
+        session_key: activeSessionKey || activeSessionId,
         include_memory: true,
         force_crew: document.getElementById('force-crew').checked,
       }),

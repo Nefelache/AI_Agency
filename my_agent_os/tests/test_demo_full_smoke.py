@@ -23,6 +23,7 @@ def demo_runtime(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
 
     api_key = "demo-smoke-api-owner"
     ws_tok = "demo-smoke-openclaw-ws"
+    monkeypatch.setattr(cfg.settings, "DEV_DISABLE_TOKEN_AUTH", False)
     monkeypatch.setattr(cfg.settings, "API_KEY_OWNER", api_key)
     monkeypatch.setattr(cfg.settings, "OPENCLAW_GATEWAY_TOKEN", ws_tok)
     return {"api_key": api_key, "ws_token": ws_tok}
