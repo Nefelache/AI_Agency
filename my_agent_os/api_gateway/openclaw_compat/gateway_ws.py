@@ -74,10 +74,10 @@ def _snapshot() -> dict[str, Any]:
         "health": {},
         "stateVersion": {"presence": 1, "health": 1},
         "uptimeMs": 0,
-        "configPath": "agent-os://compat",
-        "stateDir": "agent-os://compat",
+        "configPath": "coreclaw://compat",
+        "stateDir": "coreclaw://compat",
         "sessionDefaults": {
-            "defaultAgentId": "agent-os",
+            "defaultAgentId": "coreclaw",
             "mainKey": "main",
             "mainSessionKey": "main",
             "scope": "per-sender",
@@ -325,7 +325,7 @@ async def _dispatch_method(method: str, params: dict[str, Any], send: SendFn) ->
         if method == "sessions.patch":
             return True, {
                 "ok": True,
-                "path": "agent-os://compat",
+                "path": "coreclaw://compat",
                 "key": key,
                 "entry": {"sessionId": key},
             }, None
@@ -356,7 +356,7 @@ async def _dispatch_method(method: str, params: dict[str, Any], send: SendFn) ->
             {
                 "schema": {"type": "object", "properties": {}},
                 "uiHints": {},
-                "version": "agent-os-compat",
+                "version": "coreclaw-compat",
                 "generatedAt": "",
             },
             None,
@@ -379,13 +379,13 @@ async def _dispatch_method(method: str, params: dict[str, Any], send: SendFn) ->
         return (
             True,
             {
-                "defaultId": "agent-os",
+                "defaultId": "coreclaw",
                 "mainKey": "main",
                 "scope": "per-sender",
                 "agents": [
                     {
-                        "id": "agent-os",
-                        "name": "Agent OS",
+                        "id": "coreclaw",
+                        "name": "CoreClaw",
                         "workspace": "default",
                         "model": {"primary": settings.DEEPSEEK_MODEL} if settings.DEEPSEEK_API_KEY else {},
                     }
@@ -428,7 +428,7 @@ async def _dispatch_method(method: str, params: dict[str, Any], send: SendFn) ->
         return (
             False,
             None,
-            _err("NOT_IMPLEMENTED", "Cron is not wired in Agent OS compat gateway."),
+            _err("NOT_IMPLEMENTED", "Cron is not wired in CoreClaw compat gateway."),
         )
 
     if method == "cron.runs":
@@ -470,7 +470,7 @@ async def _dispatch_method(method: str, params: dict[str, Any], send: SendFn) ->
         return False, None, _err("INVALID_REQUEST", "duplicate connect")
 
     if method == "gateway.identity.get":
-        return True, {"deviceId": "agent-os-compat", "publicKey": ""}, None
+        return True, {"deviceId": "coreclaw-compat", "publicKey": ""}, None
 
     if method == "last-heartbeat":
         return True, None, None
@@ -479,7 +479,7 @@ async def _dispatch_method(method: str, params: dict[str, Any], send: SendFn) ->
         return True, {"status": "noop", "message": "compat gateway — use Chat tab"}, None
 
     if method == "agent.identity.get":
-        return True, {"agentId": "agent-os", "name": "Agent OS", "avatar": ""}, None
+        return True, {"agentId": "coreclaw", "name": "CoreClaw", "avatar": ""}, None
 
     if method in ("talk.config", "talk.speak", "talk.mode", "tts.status", "tts.providers"):
         return True, {}, None
@@ -498,7 +498,7 @@ async def _dispatch_method(method: str, params: dict[str, Any], send: SendFn) ->
         return True, {"ok": True}, None
 
     if method == "update.run":
-        return False, None, _err("NOT_IMPLEMENTED", "Use your package manager / git to update Agent OS.")
+        return False, None, _err("NOT_IMPLEMENTED", "Use your package manager / git to update CoreClaw.")
 
     if method in ("node.invoke", "node.event", "node.pending.pull"):
         return False, None, _err("NOT_IMPLEMENTED", "Nodes are not supported in compat gateway.")

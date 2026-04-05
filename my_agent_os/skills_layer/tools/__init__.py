@@ -36,10 +36,14 @@ def get_tool(name: str) -> "Skill":
 
 
 def list_tools() -> list[dict]:
-    """Return a list of {name, description} dicts for all registered tools."""
+    """Return metadata for all registered tools (router injects into system prompt)."""
     _ensure_loaded()
     return [
-        {"name": name, "description": getattr(cls, "description", "")}
+        {
+            "name": name,
+            "description": getattr(cls, "description", ""),
+            "skill_instructions": getattr(cls, "skill_instructions", "") or "",
+        }
         for name, cls in sorted(_registry.items())
     ]
 

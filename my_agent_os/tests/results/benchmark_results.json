@@ -1,42 +1,42 @@
 {
   "hash_vs_scan_n50": {
     "n_memories": 50,
-    "hash_avg_ms": 0.139,
-    "scan_avg_ms": 0.529,
-    "speedup_x": 3.8
+    "hash_avg_ms": 0.124,
+    "scan_avg_ms": 0.575,
+    "speedup_x": 4.65
   },
   "hash_vs_scan_n200": {
     "n_memories": 200,
-    "hash_avg_ms": 0.149,
-    "scan_avg_ms": 1.764,
-    "speedup_x": 11.81
+    "hash_avg_ms": 0.157,
+    "scan_avg_ms": 1.893,
+    "speedup_x": 12.06
   },
   "hash_vs_scan_n500": {
     "n_memories": 500,
-    "hash_avg_ms": 0.201,
-    "scan_avg_ms": 4.633,
-    "speedup_x": 23.04
+    "hash_avg_ms": 0.193,
+    "scan_avg_ms": 5.012,
+    "speedup_x": 26.01
   },
   "fts_vs_like_n50": {
     "n_memories": 50,
-    "fts_avg_ms": 1.245,
-    "like_avg_ms": 0.109,
-    "speedup_x": 0.09,
+    "fts_avg_ms": 0.627,
+    "like_avg_ms": 0.111,
+    "speedup_x": 0.18,
     "fts_ranked": true,
     "like_ranked": false
   },
   "fts_vs_like_n200": {
     "n_memories": 200,
-    "fts_avg_ms": 3.767,
-    "like_avg_ms": 0.116,
+    "fts_avg_ms": 3.527,
+    "like_avg_ms": 0.113,
     "speedup_x": 0.03,
     "fts_ranked": true,
     "like_ranked": false
   },
   "fts_vs_like_n500": {
     "n_memories": 500,
-    "fts_avg_ms": 9.689,
-    "like_avg_ms": 0.142,
+    "fts_avg_ms": 8.797,
+    "like_avg_ms": 0.116,
     "speedup_x": 0.01,
     "fts_ranked": true,
     "like_ranked": false
@@ -102,32 +102,32 @@
   ],
   "scaling_n10": {
     "n_memories": 10,
-    "avg_ms": 2.47,
-    "p95_ms": 3.02,
-    "p99_ms": 3.02
+    "avg_ms": 2.68,
+    "p95_ms": 2.94,
+    "p99_ms": 2.94
   },
   "scaling_n50": {
     "n_memories": 50,
-    "avg_ms": 4.88,
-    "p95_ms": 6.36,
-    "p99_ms": 6.36
+    "avg_ms": 4.66,
+    "p95_ms": 6.13,
+    "p99_ms": 6.13
   },
   "scaling_n100": {
     "n_memories": 100,
-    "avg_ms": 7.03,
-    "p95_ms": 9.71,
-    "p99_ms": 9.71
+    "avg_ms": 7.35,
+    "p95_ms": 10.16,
+    "p99_ms": 10.16
   },
   "scaling_n250": {
     "n_memories": 250,
-    "avg_ms": 21.53,
-    "p95_ms": 81.81,
-    "p99_ms": 81.81
+    "avg_ms": 16.6,
+    "p95_ms": 24.39,
+    "p99_ms": 24.39
   },
   "scaling_n500": {
     "n_memories": 500,
-    "avg_ms": 33.17,
-    "p95_ms": 45.21,
-    "p99_ms": 45.21
+    "avg_ms": 32.57,
+    "p95_ms": 45.7,
+    "p99_ms": 45.7
   }
 }

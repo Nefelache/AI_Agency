@@ -78,7 +78,7 @@ def _slack_post(method: str, data: dict) -> dict:
 
 
 async def _agent_reply(user_id: str, text: str) -> str:
-    """Forward message to Agent OS router and return answer."""
+    """Forward message to CoreClaw router and return answer."""
     if not _router_ref:
         return "(router not initialized)"
     try:
@@ -91,7 +91,7 @@ async def _agent_reply(user_id: str, text: str) -> str:
         )
         return result.get("brief") or result.get("answer") or "(no response)"
     except Exception as e:
-        return f"Agent OS error: {e}"
+        return f"CoreClaw error: {e}"
 
 
 # ── Routes ───────────────────────────────────────────────────────

@@ -110,7 +110,7 @@ def build_skills_status() -> dict[str, Any]:
             {
                 "name": name,
                 "description": desc,
-                "source": "agent-os",
+                "source": "coreclaw",
                 "filePath": f"{base}/{name}.py",
                 "baseDir": base,
                 "skillKey": name,
@@ -155,14 +155,14 @@ def build_health_payload() -> dict[str, Any]:
         "ts": ts,
         "durationMs": 0,
         "heartbeatSeconds": 30,
-        "defaultAgentId": "agent-os",
-        "agents": [{"id": "agent-os", "name": "Agent OS"}],
+        "defaultAgentId": "coreclaw",
+        "agents": [{"id": "coreclaw", "name": "CoreClaw"}],
         "sessions": {
             "path": str(db_path.parent),
             "count": 0,
             "recent": [],
         },
-        "service": "agent-os",
+        "service": "coreclaw",
         "version": APP_VERSION,
         "whatsapp_bridge_ok": bridge_ok,
         "memory_db": str(db_path),
@@ -173,9 +173,9 @@ def build_health_payload() -> dict[str, Any]:
 def build_status_payload() -> dict[str, Any]:
     _, bridge_err = _bridge_freshness()
     return {
-        "service": "agent-os",
+        "service": "coreclaw",
         "version": APP_VERSION,
-        "gateway": "agent-os-openclaw-compat",
+        "gateway": "coreclaw-openclaw-compat",
         "whatsapp_bridge": {"ok": bridge_err is None, "detail": bridge_err},
         "llm": {
             "provider": "deepseek",
@@ -270,7 +270,7 @@ def build_config_snapshot() -> dict[str, Any]:
             parsed_yaml = {"_parse_error": str(e)}
     merged = {
         **parsed_yaml,
-        "_agent_os_runtime": _runtime_redacted(),
+        "_coreclaw_runtime": _runtime_redacted(),
     }
     h = hashlib.sha256(raw.encode("utf-8")).hexdigest() if raw else "empty"
     return {
@@ -311,7 +311,7 @@ def tail_gateway_logs(params: dict[str, Any]) -> dict[str, Any]:
             "cursor": 0,
             "size": 0,
             "lines": [
-                "[agent-os] No audit JSONL yet — enable AUDIT_ENABLED and route traffic, "
+                "[coreclaw] No audit JSONL yet — enable AUDIT_ENABLED and route traffic, "
                 "or check my_agent_os/memory_layer/data/audit/"
             ],
             "truncated": False,
@@ -426,7 +426,7 @@ def build_sessions_usage_logs() -> dict[str, Any]:
 def build_usage_status() -> dict[str, Any]:
     return {
         **build_sessions_usage(),
-        "_note": "Agent OS compat gateway does not aggregate Pi-style usage yet.",
+        "_note": "CoreClaw compat gateway does not aggregate Pi-style usage yet.",
     }
 
 
@@ -436,7 +436,7 @@ def build_usage_cost() -> dict[str, Any]:
         "days": 0,
         "daily": [],
         "totals": _zero_cost_totals(),
-        "_note": "Agent OS compat: cost tracking not wired.",
+        "_note": "CoreClaw compat: cost tracking not wired.",
     }
 
 
@@ -448,13 +448,13 @@ def build_system_presence() -> list[dict[str, Any]]:
     bridge_ok, err = _bridge_freshness()
     return [
         {
-            "instanceId": "agent-os-gateway",
+            "instanceId": "coreclaw-gateway",
             "host": "Neural Gateway",
             "version": APP_VERSION,
             "platform": "python",
             "mode": "gateway",
             "roles": ["gateway"],
-            "reason": "agent-os",
+            "reason": "coreclaw",
         },
         {
             "instanceId": "whatsapp-baileys",

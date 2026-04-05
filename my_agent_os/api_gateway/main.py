@@ -19,6 +19,7 @@ from starlette.websockets import WebSocket
 
 from my_agent_os.api_gateway.openclaw_compat import handle_openclaw_gateway_ws
 from my_agent_os.api_gateway.routes import mobile_webhook, web_terminal, memory_api, whatsapp, health_ext, audit_api
+from my_agent_os.api_gateway.routes import wecom
 from my_agent_os.api_gateway.routes import auth_routes, billing, gdpr, voice, slack, admin_routes
 from my_agent_os.config.settings import settings
 from my_agent_os.version import __version__ as APP_VERSION
@@ -70,7 +71,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Agent OS — Neural Gateway",
+    title="CoreClaw — Neural Gateway",
     version=APP_VERSION,
     lifespan=lifespan,
 )
@@ -86,6 +87,7 @@ app.include_router(mobile_webhook.router, prefix="/mobile", tags=["Mobile"])
 app.include_router(web_terminal.router, prefix="/console", tags=["Console"])
 app.include_router(memory_api.router, prefix="/memory", tags=["Memory"])
 app.include_router(whatsapp.router)
+app.include_router(wecom.router)
 app.include_router(health_ext.router, tags=["Health"])
 app.include_router(audit_api.router)
 app.include_router(auth_routes.router)
@@ -101,9 +103,9 @@ async def openclaw_control_ui_bootstrap():
     """Bootstrap for official OpenClaw Control UI static app (assistant label + base path)."""
     return {
         "basePath": "/openclaw",
-        "assistantName": "Agent OS",
+        "assistantName": "CoreClaw",
         "assistantAvatar": "",
-        "assistantAgentId": "agent-os",
+        "assistantAgentId": "coreclaw",
         "serverVersion": APP_VERSION,
     }
 

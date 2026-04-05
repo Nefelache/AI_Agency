@@ -59,6 +59,10 @@ class VideoRenderWorkerSkill(Skill):
         "video tasks from memory, generates images via A1111, and compresses "
         "them into MP4 with MoviePy. No params required."
     )
+    skill_instructions = """
+When to use: user says start render, 开始渲染, process video queue after matrix_planner.
+No required params. Requires A1111_URL and memory tasks in pending_render.
+"""
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         engine = get_memory_engine()

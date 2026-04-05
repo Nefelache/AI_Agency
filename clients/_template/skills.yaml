@@ -1,0 +1,3 @@
+# Optional: map intents to http_connector / custom endpoints (future loader).
+# For now operators configure integrations via env and LLM uses http_fetch/http_connector.
+enabled: []

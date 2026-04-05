@@ -40,6 +40,12 @@ class Reminder(Skill):
         "message (str), in_seconds (int), in_minutes (int), repeat_seconds (int), "
         "reminder_id (str, for cancel)."
     )
+    skill_instructions = """
+When to use: user wants a timed reminder (提醒, remind me, in X minutes).
+action=set: required message; required in_seconds OR in_minutes (>0).
+action=list: no extra fields.
+action=cancel: required reminder_id from a prior list/set.
+"""
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         action = params.get("action", "set").lower()

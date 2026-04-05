@@ -1,0 +1,11 @@
+# Copy this folder to clients/<your_org_id>/ and fill in.
+name: "Example Corp"
+industry: ""
+company_size: ""
+region: ""
+language: "zh"
+systems:
+  erp: ""
+  wms: ""
+  messaging: "wecom"
+pain_points: []

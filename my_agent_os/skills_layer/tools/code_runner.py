@@ -34,6 +34,11 @@ class CodeRunner(Skill):
         "Params: code (str), language ('python'|'shell', default 'python'), "
         "timeout (int seconds, optional, max 30)."
     )
+    skill_instructions = """
+When to use: user asks to run/calculate/execute code or a snippet.
+Required: code (non-empty string). language default python; shell only if deployment enabled.
+If user did not provide code, do NOT call — ask for the snippet.
+"""
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         code     = params.get("code", "").strip()

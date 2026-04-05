@@ -9,7 +9,8 @@ def test_prompts_load_successfully():
     assert "core_identity" in prompts
     assert "control_aesthetic" in prompts
     assert "decision_engine" in prompts
-    assert "preferences" in prompts
+    assert "client_context" in prompts
+    assert "skill_dispatch_instructions" in prompts
 
 
 def test_system_message_includes_channel_override():
@@ -21,12 +22,11 @@ def test_system_message_includes_channel_override():
     assert "DESKTOP CONSOLE" in msg_console
 
 
-def test_preferences_enforce_red_lines():
+def test_client_context_defaults_empty():
     prompts = _load_prompts()
-    prefs = prompts["preferences"]
-    assert "Rap" in prefs["music"]["blacklist"]
-    assert "Alcohol" in prefs["health"]["allergies"]
-    assert prefs["interaction"]["anxiety_dampening"] is True
+    ctx = prompts["client_context"]
+    assert isinstance(ctx, dict)
+    assert ctx.get("industry") == ""
 
 
 @pytest.mark.asyncio

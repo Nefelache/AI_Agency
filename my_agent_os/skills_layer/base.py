@@ -16,6 +16,8 @@ from typing import Any, ClassVar
 class Skill(ABC):
     name: ClassVar[str]
     description: ClassVar[str]
+    # OpenClaw-style: full invocation rules for the main LLM (params, when to call, examples).
+    skill_instructions: ClassVar[str] = ""
 
     @abstractmethod
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:

@@ -52,6 +52,10 @@ class MatrixContentPlannerSkill(Skill):
         "Generate differentiated short-video scripts for 8 accounts from one core topic "
         "and queue them for rendering. Params: topic (str), count (int, default 8)."
     )
+    skill_instructions = """
+When to use: user wants multi-account short-video scripts from one topic (矩阵, 批量脚本).
+Required: topic (non-empty string). Optional: count int ≤ 8.
+"""
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         topic = params.get("topic", "").strip()

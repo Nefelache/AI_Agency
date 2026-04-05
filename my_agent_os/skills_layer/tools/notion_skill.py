@@ -54,6 +54,13 @@ class NotionSkill(Skill):
         "database_id (str, for create), title (str), content (str), "
         "properties (dict, optional)."
     )
+    skill_instructions = """
+Requires NOTION_API_KEY on the server.
+action=search: query string (can be empty for recent).
+action=read: page_id.
+action=append: page_id + content.
+action=create: database_id + title; content optional.
+"""
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         if not _NOTION_KEY:

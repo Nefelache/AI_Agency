@@ -21,6 +21,12 @@ from my_agent_os.skills_layer.tools import register
 class WebSearch(Skill):
     name = "web_search"
     description = "Search the web for real-time information. Params: query (str), num_results (int, optional, default 5)."
+    skill_instructions = """
+When to use: user wants current/public information (news, prices, facts, "search for X", 搜索).
+Required: query — concise search string in the user's language (not an empty string).
+Optional: num_results (int, default 5).
+If the user only says "search" with no topic, do NOT call this skill — ask what to search.
+"""
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         query = params.get("query", "").strip()

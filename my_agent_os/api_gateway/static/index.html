@@ -3,30 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent OS</title>
+<title>CoreClaw</title>
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#212121">
+<meta name="theme-color" content="#5b4df6">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Agent OS">
+<meta name="apple-mobile-web-app-title" content="CoreClaw">
 <link rel="apple-touch-icon" href="/icon-192.svg">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#212121;--sidebar:#171717;--surface:#2f2f2f;--surface-hi:#3a3a3a;
-  --border:#404040;--border-dim:#303030;
-  --text:#ececec;--text-dim:#8a8a8a;--text-muted:#5a5a5a;
-  --accent:#19c37d;--accent-dim:#0d6e46;
-  --mem-sem:#f59e0b;--mem-sem-bg:rgba(245,158,11,.12);
-  --mem-ep:#818cf8;--mem-ep-bg:rgba(129,140,248,.12);
-  --mem-proc:#22d3ee;--mem-proc-bg:rgba(34,211,238,.12);
-  --user-bg:#2a2a2a;
+  --bg:#f4f6fb;--sidebar:#ffffff;--surface:#ffffff;--surface-hi:#eef1f8;
+  --border:#e2e8f0;--border-dim:#e8edf5;
+  --text:#0f172a;--text-dim:#475569;--text-muted:#94a3b8;
+  --accent:#5b4df6;--accent-dim:#4338ca;
+  --mem-sem:#d97706;--mem-sem-bg:rgba(217,119,6,.1);
+  --mem-ep:#6366f1;--mem-ep-bg:rgba(99,102,241,.1);
+  --mem-proc:#0891b2;--mem-proc-bg:rgba(8,145,178,.1);
+  --user-bg:#eef2ff;
   --font:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif;
   --mono:'SF Mono','Cascadia Code','Consolas',monospace;
   --radius:10px;--radius-sm:6px;
   --trans:.18s ease;
 }
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;overflow:hidden}
+body{letter-spacing:-0.01em}
 
 /* ─── App shell ──────────────────────────────────── */
 #app{display:flex;height:100vh;overflow:hidden}
@@ -34,7 +35,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 /* ─── Sidebar ────────────────────────────────────── */
 #sidebar{
   width:260px;flex-shrink:0;display:flex;flex-direction:column;
-  background:var(--sidebar);border-right:1px solid var(--border-dim);
+  background:var(--sidebar);border-right:1px solid var(--border-dim);box-shadow:4px 0 24px rgba(15,23,42,.04);
   transition:width var(--trans);overflow:hidden;
 }
 #sidebar.collapsed{width:0;border-right:none}
@@ -117,9 +118,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   display:flex;padding:8px 20px;gap:14px;
   transition:background var(--trans);
 }
-.msg-row:hover{background:rgba(255,255,255,.02)}
-.msg-row.user .avatar{background:var(--accent-dim);color:#fff}
-.msg-row.agent .avatar{background:#3d3d3d}
+.msg-row:hover{background:rgba(91,77,246,.04)}
+.msg-row.user .avatar{background:var(--accent);color:#fff}
+.msg-row.agent .avatar{background:#e0e7ff;color:var(--accent-dim)}
 
 .avatar{
   width:30px;height:30px;border-radius:50%;flex-shrink:0;
@@ -147,11 +148,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   color:#a8c7fa;
 }
 .msg-content pre{
-  background:#1a1a2e;border:1px solid var(--border);border-radius:var(--radius-sm);
+  background:#f1f5f9;border:1px solid var(--border);border-radius:var(--radius-sm);
   padding:14px 16px;overflow-x:auto;margin:.5em 0;
 }
-.msg-content pre code{background:none;padding:0;color:#c9d1d9;font-size:12.5px}
-.msg-content strong{font-weight:600;color:#fff}
+.msg-content pre code{background:none;padding:0;color:#334155;font-size:12.5px}
+.msg-content strong{font-weight:600;color:#0f172a}
 .msg-content em{font-style:italic;color:var(--text-dim)}
 .msg-content table{border-collapse:collapse;margin:.5em 0;font-size:13px;width:100%}
 .msg-content th,.msg-content td{border:1px solid var(--border);padding:6px 12px;text-align:left}
@@ -175,13 +176,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .crew-toggle:hover{color:var(--text-dim)}
 .crew-views{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .crew-views.hidden{display:none}
-.crew-view{padding:8px 12px;border-radius:var(--radius-sm);background:#1a1a2e;border:1px solid #2d2d5e;font-size:12px;line-height:1.6}
+.crew-view{padding:8px 12px;border-radius:var(--radius-sm);background:#f8fafc;border:1px solid var(--border);font-size:12px;line-height:1.6}
 .crew-view .dept{font-size:10px;font-weight:600;color:var(--mem-ep);font-family:var(--mono);text-transform:uppercase;margin-bottom:3px}
 
 .typing{
   padding:8px 20px;display:flex;align-items:center;gap:14px;
 }
-.typing .avatar{background:#3d3d3d}
+.typing .avatar{background:#e0e7ff}
 .typing-dots{display:flex;gap:4px;padding:2px 0}
 .typing-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:blink 1.4s infinite both}
 .typing-dot:nth-child(2){animation-delay:.2s}
@@ -232,7 +233,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 #tts-btn.speaking{color:var(--accent);border-color:var(--accent)}
 #send-btn{
   width:32px;height:32px;border-radius:var(--radius-sm);border:none;
-  background:var(--accent);color:#0e0e10;cursor:pointer;
+  background:var(--accent);color:#fff;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;transition:opacity var(--trans);
 }
@@ -335,8 +336,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 /* Chip detail tooltip */
 #chip-tooltip{
   position:fixed;z-index:100;max-width:280px;
-  background:#1e1e2e;border:1px solid var(--border);border-radius:var(--radius);
-  padding:14px;box-shadow:0 8px 32px rgba(0,0,0,.6);
+  background:#fff;border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px;box-shadow:0 12px 40px rgba(15,23,42,.12);
   pointer-events:none;opacity:0;transform:translateY(4px);
   transition:opacity .15s,transform .15s;font-size:13px;line-height:1.6;
 }
@@ -387,7 +388,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
       </button>
-      <div id="chat-title">Agent OS</div>
+      <div id="chat-title">CoreClaw</div>
       <div class="hdr-actions">
         <span id="force-crew-wrap">
           <input type="checkbox" id="force-crew">
@@ -401,15 +402,15 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     <div id="messages">
       <div id="welcome">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.25"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
-        <h2>Your Second Brain, Ready.</h2>
-        <p>Enter your API key, then start chatting.<br>Complex tasks route to multi-agent crew automatically.</p>
+        <h2>Enterprise AI control plane</h2>
+        <p>Operator console: enter API key, then orchestrate skills and memory.<br>Heavy analysis can use multi-agent crew on the console channel.</p>
         <p><span class="shortcut">Enter</span> send &nbsp;·&nbsp; <span class="shortcut">Shift+Enter</span> newline</p>
       </div>
     </div>
 
     <div id="input-bar">
       <div id="input-wrap">
-        <textarea id="input" rows="1" placeholder="Message Agent OS…" autofocus></textarea>
+        <textarea id="input" rows="1" placeholder="Message CoreClaw…" autofocus></textarea>
         <button id="voice-btn" onclick="toggleVoice()" title="Voice input (Whisper)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
         </button>
@@ -518,7 +519,7 @@ function newChat(sessionKey) {
   messagesEl.innerHTML = '';
   messagesEl.appendChild(welcomeEl);
   welcomeEl.style.display = 'flex';
-  const displayTitle = (key !== id) ? key : 'Agent OS';
+  const displayTitle = (key !== id) ? key : 'CoreClaw';
   document.getElementById('chat-title').textContent = displayTitle;
   setUrlSession(key);
   renderSessionList();
@@ -546,7 +547,7 @@ function loadSession(id) {
   messagesEl.innerHTML = '';
   welcomeEl.style.display = 'none';
   activeMessages.forEach(m => _renderMsg(m.role, m.content, m.actions, m.crewViews));
-  const displayTitle = (s.key && s.key !== s.id) ? s.key : (s.preview || 'Agent OS');
+  const displayTitle = (s.key && s.key !== s.id) ? s.key : (s.preview || 'CoreClaw');
   document.getElementById('chat-title').textContent = displayTitle;
   setUrlSession(activeSessionKey);
   renderSessionList();
@@ -700,7 +701,7 @@ function _renderMsg(role, content, actions, crewViews) {
 
   const initials = role === 'user' ? 'U' : 'A';
   let html = `<div class="avatar">${initials}</div><div class="msg-body">`;
-  html += `<div class="msg-name">${role === 'user' ? 'You' : 'Agent OS'}</div>`;
+  html += `<div class="msg-name">${role === 'user' ? 'You' : 'CoreClaw'}</div>`;
   html += `<div class="msg-content">${role === 'agent' ? renderMd(content) : esc(content).replace(/\n/g,'<br>')}</div>`;
 
   if (actions && actions.length) {
@@ -785,7 +786,7 @@ async function send() {
     const d = await r.json();
     const answer = d.answer || d.brief || '(no response)';
     appendMsg('agent', answer, d.next_actions||[], d.crew_views||null);
-    document.getElementById('chat-title').textContent = text.slice(0, 45) || 'Agent OS';
+    document.getElementById('chat-title').textContent = text.slice(0, 45) || 'CoreClaw';
 
     if (memPanel.classList.contains('open')) {
       setTimeout(refreshMemMap, 2000);

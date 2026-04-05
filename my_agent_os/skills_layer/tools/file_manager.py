@@ -36,6 +36,12 @@ class FileManager(Skill):
         "path (str, relative), content (str, for write/append), "
         "encoding (str, optional, default utf-8)."
     )
+    skill_instructions = """
+When to use: user wants to read/write/list files under the agent workspace.
+action=list: path optional (root if empty).
+Other actions: required path (relative, no ..).
+write/append: required content.
+"""
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         action   = params.get("action", "read").lower()

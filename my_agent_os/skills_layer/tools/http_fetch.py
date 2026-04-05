@@ -26,6 +26,12 @@ class HttpFetch(Skill):
         "headers (dict, optional), body (str|dict, optional), "
         "timeout (int seconds, optional)."
     )
+    skill_instructions = """
+When to use: call a known REST endpoint or webhook the user named.
+Required: url (https://...).
+Optional: method (GET default), headers dict, body string or JSON object, timeout.
+Do not call arbitrary internal IPs unless the user explicitly requested that URL.
+"""
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         url     = params.get("url", "").strip()

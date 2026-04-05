@@ -28,6 +28,11 @@ _WMO_CODES = {
 class Weather(Skill):
     name = "weather"
     description = "Get current weather and 3-day forecast for any city. Params: city (str), units ('celsius'|'fahrenheit', optional)."
+    skill_instructions = """
+When to use: user asks for weather, forecast, 天气 for a place.
+Required: city (non-empty place name).
+Optional: units celsius|fahrenheit.
+"""
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         city  = params.get("city", "").strip()

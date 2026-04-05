@@ -42,6 +42,13 @@ class EmailHandler(Skill):
         "folder ('INBOX', for read), limit (int, for read, default 10), "
         "query (str, for search)."
     )
+    skill_instructions = """
+When to use: user explicitly wants to send mail, list inbox, or search mail.
+action=send: required to, subject, body (html optional bool).
+action=read: optional folder (default INBOX), limit (default 10).
+action=search: required query string.
+If SMTP/IMAP not configured, the skill will fail — explain that to the user after.
+"""
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         action = params.get("action", "send").lower()

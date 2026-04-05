@@ -120,7 +120,7 @@ def test_websocket_channels_status_and_config(api_client: TestClient, openclaw_t
         assert m2["ok"] is True
         cfg = m2["payload"]
         assert "raw" in cfg
-        assert "_agent_os_runtime" in cfg.get("parsed", {})
+        assert "_coreclaw_runtime" in cfg.get("parsed", {})
 
         ws.send_json(
             {

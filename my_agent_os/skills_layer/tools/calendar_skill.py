@@ -39,6 +39,12 @@ class CalendarSkill(Skill):
         "description (str, optional), event_id (str, for delete), "
         "days_ahead (int, for list, default 7)."
     )
+    skill_instructions = """
+When to use: schedule, calendar, 日历, meetings.
+action=list|today: optional days_ahead for list.
+action=add: title, start, end (ISO 8601).
+action=delete: event_id from list output.
+"""
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         action = params.get("action", "list").lower()

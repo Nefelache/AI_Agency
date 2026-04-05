@@ -16,7 +16,7 @@ def test_email_handler_registered():
 def test_all_skills_registered():
     """All expected skills should appear in the registry."""
     names = [t["name"] for t in list_tools()]
-    expected = {"email", "web_search", "weather", "http_fetch",
+    expected = {"email", "web_search", "weather", "http_fetch", "http_connector",
                 "file_manager", "code_runner", "calendar", "reminder", "notion"}
     assert expected.issubset(set(names)), f"Missing skills: {expected - set(names)}"
 

@@ -1,11 +1,11 @@
 {
-  "name": "Agent OS",
-  "short_name": "Agent OS",
-  "description": "Your local AI command center with persistent memory",
+  "name": "CoreClaw",
+  "short_name": "CoreClaw",
+  "description": "Enterprise AI control plane with memory and skills",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#212121",
-  "theme_color": "#212121",
+  "background_color": "#f4f6fb",
+  "theme_color": "#5b4df6",
   "orientation": "portrait-primary",
   "icons": [
     {

@@ -76,22 +76,84 @@ def _build_openclaw_system_message(prompts: dict) -> str:
     return "\n\n".join(blocks)
 
 
-def _append_openclaw_skill_catalog(system_message: str) -> str:
-    """Inject live skill registry (OpenClaw-style tooling section, Agent OS reality)."""
-    from my_agent_os.skills_layer.tools import list_tools
-
+def _skills_instruction_catalog() -> str:
+    """Per-skill instructions for the main LLM (OpenClaw-style SKILL.md content in-code)."""
     tools = list_tools()
-    lines = [
-        "## Registered skills (Agent OS)",
-        "Host router may auto-dispatch when intent matches. You reason with the user using natural language; execution goes through these capabilities.",
-    ]
+    lines: list[str] = ["## Skill reference (follow when invoking a skill)", ""]
     for t in tools:
         name = t.get("name", "?")
-        desc = (t.get("description") or "").strip().replace("\n", " ")
-        if len(desc) > 300:
-            desc = desc[:297] + "..."
-        lines.append(f"- **{name}**: {desc}")
-    return system_message + "\n\n" + "\n".join(lines)
+        desc = (t.get("description") or "").strip()
+        instr = (t.get("skill_instructions") or "").strip()
+        lines.append(f"### {name}")
+        if desc:
+            lines.append(desc)
+        if instr:
+            lines.append(instr)
+        lines.append("")
+    return "\n".join(lines).strip()
+
+
+def _append_skills_to_system(system_message: str, prompts: dict) -> str:
+    """Append global dispatch rules + full skill docs to system prompt (all channels)."""
+    dispatch = prompts.get("skill_dispatch_instructions")
+    if isinstance(dispatch, str) and dispatch.strip():
+        system_message = system_message + "\n\n" + dispatch.strip()
+    return system_message + "\n\n" + _skills_instruction_catalog()
+
+
+def _extract_skill_call(data: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(data, dict):
+        return None
+    sc = data.get("skill_call")
+    if not isinstance(sc, dict):
+        return None
+    name = sc.get("name") or sc.get("skill")
+    if not name or not isinstance(name, str):
+        return None
+    params = sc.get("params")
+    if not isinstance(params, dict):
+        params = {}
+    return {"name": name.strip(), "params": params}
+
+
+async def _execute_skill_call(skill_call: dict[str, Any]) -> str | None:
+    name = skill_call["name"]
+    params = skill_call["params"]
+    try:
+        tool = get_tool(name)
+        result = await tool.execute(params)
+    except KeyError:
+        logger.info("Unknown skill name from LLM: %s", name)
+        return None
+    except Exception as e:
+        logger.warning("Skill %s raised: %s", name, e)
+        return None
+
+    if not result.get("success", True):
+        logger.info("Skill %s failed: %s", name, result.get("reason"))
+        return None
+    return (result.get("output") or str(result)).strip() or None
+
+
+def _merge_skill_into_parsed(parsed: dict[str, Any], skill_output: str, channel: str) -> None:
+    if channel == "mobile":
+        base = (parsed.get("brief") or "").strip()
+        merged = f"{base}\n\n{skill_output}".strip() if base else skill_output
+        parsed["brief"] = merged[:800]
+    else:
+        base = (parsed.get("answer") or "").strip()
+        parsed["answer"] = f"{base}\n\n{skill_output}".strip() if base else skill_output
+
+
+async def _apply_skill_from_parsed(parsed: dict[str, Any], channel: str) -> dict[str, Any]:
+    sc = parsed.pop("skill_call", None)
+    if not sc:
+        return parsed
+    out = await _execute_skill_call(sc)
+    if out:
+        _merge_skill_into_parsed(parsed, out, channel)
+        parsed["skill_used"] = sc["name"]
+    return parsed
 
 
 def _build_system_message(prompts: dict, channel: str) -> str:
@@ -123,10 +185,7 @@ async def route(
     session_id = user_id
 
     prompts = _load_prompts()
-    system_msg = _build_system_message(prompts, channel)
-    if channel == "openclaw":
-        system_msg = _append_openclaw_skill_catalog(system_msg)
-    preferences = prompts.get("preferences", {})
+    system_msg = _append_skills_to_system(_build_system_message(prompts, channel), prompts)
 
     user_payload_parts = [raw_input]
 
@@ -141,9 +200,13 @@ async def route(
         except Exception as e:
             logger.warning("Memory retrieval failed (non-fatal): %s", e)
 
-    user_payload_parts.append(
-        f"\n[User Preferences]\n{json.dumps(preferences, ensure_ascii=False)}"
-    )
+    client_ctx = prompts.get("client_context", {})
+    if isinstance(client_ctx, dict) and any(
+        v not in (None, "", [], {}) for v in client_ctx.values()
+    ):
+        user_payload_parts.append(
+            f"\n[Client context]\n{json.dumps(client_ctx, ensure_ascii=False)}"
+        )
 
     # Complexity routing: crew (console only) or single agent
     if _crew_orchestrator and channel == "console":
@@ -153,28 +216,13 @@ async def route(
         if complexity >= CREW_COMPLEXITY_THRESHOLD:
             return await _route_via_crew(raw_input, user_id, system_msg, user_payload_parts, channel, start_ts)
 
-    # Skill dispatch: check if the input maps to a registered skill
-    skill_result = await _try_skill_dispatch(raw_input, user_payload_parts)
-    if skill_result is None and await _detect_skill_gap(raw_input):
-        logger.info("SKILL_GAP detected: %.80s", raw_input)
-    if skill_result is not None:
-        if _memory_engine:
-            _memory_engine.process_turn_background(user_id, raw_input, skill_result.get("answer", ""))
-        latency_ms = (time.perf_counter() - start_ts) * 1000
-        try:
-            from my_agent_os.enterprise.audit import log_route
-            log_route(session_id=session_id, channel=channel, user_id=user_id,
-                      raw_input=raw_input, response=skill_result, latency_ms=round(latency_ms, 2))
-        except Exception:
-            pass
-        return skill_result
-
-    # Single-agent path (whatsapp, mobile, console fallback)
+    # Single-agent path: main LLM decides skill_call + answer in one pass (OpenClaw-style)
     raw_response = await call_llm(
         system_message=system_msg,
         user_message="\n".join(user_payload_parts),
     )
     parsed = _parse_response(raw_response, channel)
+    parsed = await _apply_skill_from_parsed(parsed, channel)
     parsed = _sanitize_parsed(parsed, channel)
 
     if _memory_engine:
@@ -234,6 +282,7 @@ async def _route_via_crew(
             user_message="\n".join(user_payload_parts),
         )
         parsed = _parse_response(raw_response, channel)
+        parsed = await _apply_skill_from_parsed(parsed, channel)
 
     parsed = _sanitize_parsed(parsed, channel)
 
@@ -275,11 +324,22 @@ def _sanitize_parsed(parsed: dict[str, Any], channel: str) -> dict[str, Any]:
 
 def _parse_response(raw: str, channel: str) -> dict[str, Any]:
     data = _try_extract_json(raw)
+    skill_call = _extract_skill_call(data) if isinstance(data, dict) else None
 
     if data is None:
         if channel == "mobile":
-            return {"action": "respond", "options": None, "brief": raw.strip()[:200]}
-        return {"answer": raw.strip(), "sources": None, "next_actions": []}
+            return {
+                "action": "respond",
+                "options": None,
+                "brief": raw.strip()[:200],
+                "skill_call": None,
+            }
+        return {
+            "answer": raw.strip(),
+            "sources": None,
+            "next_actions": [],
+            "skill_call": None,
+        }
 
     actions = (
         data.get("next_actions")
@@ -301,6 +361,7 @@ def _parse_response(raw: str, channel: str) -> dict[str, Any]:
             "action": data.get("action", "respond"),
             "options": _normalize_str_list(options) if options else None,
             "brief": (answer or raw.strip())[:200],
+            "skill_call": skill_call,
         }
     raw_sources = data.get("sources") or data.get("memory_sources")
     sources = raw_sources if isinstance(raw_sources, list) else None
@@ -309,6 +370,7 @@ def _parse_response(raw: str, channel: str) -> dict[str, Any]:
         "answer": answer,
         "sources": sources,
         "next_actions": _normalize_str_list(actions),
+        "skill_call": skill_call,
     }
 
 
@@ -343,88 +405,6 @@ def _try_extract_json(raw: str) -> dict[str, Any] | None:
             pass
 
     return None
-
-
-async def _try_skill_dispatch(
-    raw_input: str,
-    user_payload_parts: list[str],
-) -> dict[str, Any] | None:
-    """
-    Ask the LLM to classify whether the user's request maps to a registered skill.
-    Returns a formatted response dict if a skill executes successfully, else None.
-    """
-    tools = list_tools()
-    if not tools:
-        return None
-
-    tool_list = "\n".join(f'  "{t["name"]}": {t["description"]}' for t in tools)
-    classifier_system = (
-        "You are a skill dispatcher. Given a user message, decide if it maps to one of these tools:\n"
-        + tool_list
-        + "\n\nRespond ONLY with a JSON object: "
-        '{\"skill\": \"<name or null>\", \"params\": {<extracted params>}}\n'
-        "If no skill matches, return {\"skill\": null}. Never add explanation."
-    )
-
-    skill_name: str | None = None
-    try:
-        raw = await call_llm(
-            system_message=classifier_system,
-            user_message=raw_input,
-            response_json=True,
-            temperature=0.1,
-        )
-        data = _try_extract_json(raw)
-        if not data or not data.get("skill"):
-            return None
-
-        skill_name = data["skill"]
-        params     = data.get("params", {})
-
-        try:
-            tool   = get_tool(skill_name)
-            result = await tool.execute(params)
-        except KeyError:
-            return None
-
-        output = result.get("output") or str(result)
-        if not result.get("success", True):
-            reason = result.get("reason", "Unknown error")
-            output = f"[{skill_name}] failed: {reason}"
-
-        return {
-            "answer":       output,
-            "sources":      None,
-            "next_actions": [],
-            "skill_used":   skill_name,
-        }
-    except KeyError:
-        return None
-    except Exception as e:
-        if skill_name:
-            logger.warning("Skill execution error [%s]: %s", skill_name, e)
-            return {
-                "answer":       f"I found the right skill ({skill_name}) but ran into an error: {e}",
-                "sources":      None,
-                "next_actions": ["Try rephrasing", "Check skill configuration"],
-                "skill_used":   skill_name,
-                "skill_error":  True,
-            }
-        logger.debug("Skill dispatch classification failed (non-fatal): %s", e)
-        return None
-
-
-_ACTION_KEYWORDS = {
-    "search", "find", "get", "fetch", "create", "generate", "send", "write",
-    "calculate", "convert", "check", "download", "weather", "remind", "email",
-    "搜索", "查找", "生成", "创建", "发送", "计算", "转换", "查天气", "提醒",
-}
-
-
-async def _detect_skill_gap(raw_input: str) -> bool:
-    """Return True if the input looks like it needs a tool but none matched."""
-    lowered = raw_input.lower()
-    return any(kw in lowered for kw in _ACTION_KEYWORDS)
 
 
 def _normalize_str_list(items: Any) -> list[str]:
