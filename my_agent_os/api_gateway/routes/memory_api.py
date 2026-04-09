@@ -36,6 +36,12 @@ class SearchRequest(BaseModel):
     top_k: int = Field(10, ge=1, le=50)
 
 
+class PalaceSearchRequest(BaseModel):
+    query: str
+    top_k: int = Field(8, ge=1, le=50)
+    wing: str | None = None
+
+
 class MemoryOut(BaseModel):
     id: str
     memory_type: str
@@ -104,6 +110,38 @@ async def search_memories(
     engine = _get_engine()
     records = await engine.search_memories(auth.user_id, req.query, req.top_k)
     return [_memory_to_out(r) for r in records]
+
+
+@router.get("/palace/overview")
+async def palace_overview(
+    auth: AuthContext = Depends(get_auth_context),
+) -> dict[str, Any]:
+    engine = _get_engine()
+    return await engine.palace_overview(auth.user_id)
+
+
+@router.get("/palace/rooms")
+async def palace_rooms(
+    wing: str | None = None,
+    limit: int = 50,
+    auth: AuthContext = Depends(get_auth_context),
+) -> list[dict[str, Any]]:
+    engine = _get_engine()
+    return await engine.palace_rooms(user_id=auth.user_id, wing=wing, limit=limit)
+
+
+@router.post("/palace/search")
+async def palace_search(
+    req: PalaceSearchRequest,
+    auth: AuthContext = Depends(get_auth_context),
+) -> list[dict[str, Any]]:
+    engine = _get_engine()
+    return await engine.palace_search(
+        user_id=auth.user_id,
+        query=req.query,
+        top_k=req.top_k,
+        wing=req.wing,
+    )
 
 
 @router.post("/seal")

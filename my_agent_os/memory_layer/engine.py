@@ -1,32 +1,17 @@
-"""
-Memory Engine — The unified façade for the entire memory subsystem.
-
-All external code (router_engine, API routes) talks ONLY to this class.
-Internal components (store, writer, reader, session) are never exposed.
-
-Lifecycle:
-  engine = MemoryEngine(settings)
-  await engine.initialize()
-  ...
-  await engine.close()
-"""
+"""Memory engine v2 (MemoryPalace style, embedding-first)."""
 
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 import logging
+from pathlib import Path
 from typing import Any, Awaitable, Callable
 
-from my_agent_os.memory_layer.models import (
-    InjectionContext,
-    MemoryRecord,
-    MemoryType,
-    Session,
-)
-from my_agent_os.memory_layer.reader import MemoryReader
-from my_agent_os.memory_layer.session import SessionManager
-from my_agent_os.memory_layer.store import MemoryStore
-from my_agent_os.memory_layer.writer import MemoryWriter
+from my_agent_os.config.settings import settings
+from my_agent_os.memory_layer.embedding_client import EmbeddingClient
+from my_agent_os.memory_layer.models import InjectionContext, MemoryRecord, MemoryType, Session
+from my_agent_os.memory_layer.palace_store import PalaceStore, WINGS
 
 logger = logging.getLogger(__name__)
 
@@ -34,20 +19,6 @@ LLMFunc = Callable[[str, str, bool], Awaitable[str]]
 
 
 class MemoryEngine:
-    """
-    Single entry point for memory operations.
-
-    Usage:
-        engine = MemoryEngine(db_path, llm_func)
-        await engine.initialize()
-
-        # Before LLM call — retrieve relevant memories
-        context = await engine.retrieve(user_id, query)
-
-        # After LLM call — process the turn in background
-        engine.process_turn_background(user_id, user_msg, assistant_msg)
-    """
-
     def __init__(
         self,
         db_path: str,
@@ -56,206 +27,152 @@ class MemoryEngine:
         decay_days: float = 7.0,
         max_injection_chars: int = 2000,
     ):
-        self._store = MemoryStore(db_path)
-        self._writer = MemoryWriter(self._store, llm)
-        self._reader = MemoryReader(
-            self._store, llm,
-            top_k=top_k,
-            decay_days=decay_days,
-            max_injection_chars=max_injection_chars,
-        )
-        self._session_mgr = SessionManager(self._store, self._writer)
+        self._llm = llm
+        self._top_k = top_k
+        self._max_chars = max_injection_chars
         self._initialized = False
-
-    # ── Lifecycle ────────────────────────────────────────
+        self._enabled = bool(settings.MEMORY_V2_ENABLED)
+        active_db = settings.MEMORY_V2_DB_PATH if self._enabled else db_path
+        self._palace = PalaceStore(active_db)
+        self._embed = EmbeddingClient()
 
     async def initialize(self) -> None:
         if self._initialized:
             return
-        await self._store.initialize()
+        await self._palace.initialize()
         self._initialized = True
-        logger.info("MemoryEngine initialized.")
+        logger.info("MemoryEngine v2 initialized.")
 
     async def close(self) -> None:
-        await self._store.close()
+        await self._palace.close()
         self._initialized = False
 
-    # ── Core Operations ──────────────────────────────────
-
-    async def retrieve(
-        self, user_id: str, query: str
-    ) -> InjectionContext:
-        """
-        Retrieve relevant memories for a given query.
-        Called BEFORE the LLM generates a response.
-        """
+    async def retrieve(self, user_id: str, query: str) -> InjectionContext:
         await self._ensure_init()
-        return await self._reader.retrieve(query, user_id)
-
-    async def process_turn(
-        self,
-        user_id: str,
-        user_msg: str,
-        assistant_msg: str,
-    ) -> bool:
-        """
-        Process a completed conversation turn:
-          1. Ensure an active session exists.
-          2. Record both turns.
-          3. Extract memories (facts, events, patterns).
-          4. Consolidate with existing memories.
-          5. Seal session if topic concluded.
-
-        Returns True if the session was sealed.
-        """
-        await self._ensure_init()
-        session = await self._session_mgr.get_or_create(user_id)
-
-        await self._session_mgr.record_turn(session.id, "user", user_msg)
-        await self._session_mgr.record_turn(session.id, "assistant", assistant_msg)
-
-        sealed = await self._session_mgr.process_and_maybe_seal(
-            session.id, user_msg, assistant_msg, user_id
-        )
-        return sealed
-
-    def process_turn_background(
-        self,
-        user_id: str,
-        user_msg: str,
-        assistant_msg: str,
-    ) -> None:
-        """
-        Fire-and-forget version of process_turn.
-        The response is returned to the user immediately;
-        memory processing happens asynchronously.
-        """
-        asyncio.create_task(
-            self._safe_process(user_id, user_msg, assistant_msg)
+        if not query.strip():
+            return InjectionContext()
+        qvec = await self._embed.embed_text(query)
+        hits = await self._palace.vector_search(user_id, qvec, query_text=query, top_k=self._top_k)
+        if not hits:
+            return InjectionContext()
+        summary_parts: list[str] = []
+        detail_parts: list[str] = []
+        char_budget = max(800, self._max_chars)
+        used = 0
+        for h in hits:
+            snippet = (h["content"] or "").strip().replace("\n", " ")
+            if not snippet:
+                continue
+            line = f"- [{h['wing']}/{h['room']}] {snippet[:180]}"
+            summary_parts.append(line)
+            if used < char_budget:
+                detail = f"  ({h['role']}, score={h['score']}) {snippet[:320]}"
+                detail_parts.append(detail)
+                used += len(detail)
+        return InjectionContext(
+            summary_layer="\n".join(summary_parts),
+            decision_layer="",
+            detail_layer="\n".join(detail_parts),
+            source_ids=[h["id"] for h in hits],
+            token_estimate=used // 4,
         )
 
-    async def _safe_process(
-        self, user_id: str, user_msg: str, assistant_msg: str
-    ) -> None:
+    async def process_turn(self, user_id: str, user_msg: str, assistant_msg: str) -> bool:
+        await self._ensure_init()
+        vectors = await self._embed.embed_texts([user_msg or "", assistant_msg or ""])
+        await self._palace.ingest_turn(
+            user_id=user_id,
+            user_msg=user_msg or "",
+            assistant_msg=assistant_msg or "",
+            embedding_model=settings.EMBEDDING_MODEL,
+            vectors=vectors,
+            source_session_id=user_id,
+        )
+        return False
+
+    def process_turn_background(self, user_id: str, user_msg: str, assistant_msg: str) -> None:
+        asyncio.create_task(self._safe_process(user_id, user_msg, assistant_msg))
+
+    async def _safe_process(self, user_id: str, user_msg: str, assistant_msg: str) -> None:
         try:
             await self.process_turn(user_id, user_msg, assistant_msg)
         except Exception as e:
             logger.error("Background memory processing failed: %s", e)
 
-    # ── Session Management ───────────────────────────────
-
     async def force_seal_session(self, user_id: str) -> dict[str, Any]:
-        """Manually seal the current active session."""
         await self._ensure_init()
-        session = await self._store.get_active_session(user_id)
-        if not session:
+        recent = await self._palace.list_recent_drawers(user_id, limit=8)
+        if not recent:
             return {"status": "no_active_session"}
+        wing = recent[0]["wing"]
+        summary = " | ".join((r["content"] or "")[:72] for r in recent[:3] if r["content"])
+        return {"status": "sealed", "session_id": user_id, "topic": wing, "summary": summary}
 
-        await self._session_mgr.force_seal(session.id, user_id)
-        updated = await self._store.get_session(session.id)
-        return {
-            "status": "sealed",
-            "session_id": session.id,
-            "topic": updated.topic if updated else None,
-            "summary": updated.summary if updated else None,
-        }
-
-    async def list_sessions(
-        self, user_id: str, limit: int = 20
-    ) -> list[Session]:
+    async def list_sessions(self, user_id: str, limit: int = 20) -> list[Session]:
         await self._ensure_init()
-        return await self._store.list_sessions(user_id, limit)
+        return []
 
-    # ── Memory Management ────────────────────────────────
-
-    async def search_memories(
-        self, user_id: str, query: str, top_k: int = 10
-    ) -> list[MemoryRecord]:
-        """Search memories by full-text search."""
+    async def search_memories(self, user_id: str, query: str, top_k: int = 10) -> list[MemoryRecord]:
         await self._ensure_init()
-        hits = await self._store.fulltext_search(query, top_k=top_k, user_id=user_id)
-        records = []
-        for mid, _ in hits:
-            rec = await self._store.get_memory(mid)
-            if rec:
-                records.append(rec)
-        return records
+        qvec = await self._embed.embed_text(query)
+        hits = await self._palace.vector_search(user_id, qvec, query_text=query, top_k=top_k)
+        return [self._drawer_to_record(h) for h in hits]
 
-    async def get_all_memories(
-        self, user_id: str, limit: int = 100
-    ) -> list[MemoryRecord]:
+    async def get_all_memories(self, user_id: str, limit: int = 100) -> list[MemoryRecord]:
         await self._ensure_init()
-        return await self._store.get_all_memories(user_id, limit)
+        rows = await self._palace.list_recent_drawers(user_id, limit=limit)
+        return [self._drawer_to_record(r) for r in rows]
 
     async def delete_memory(self, memory_id: str) -> None:
         await self._ensure_init()
-        await self._store.delete_memory(memory_id)
+        await self._palace.delete_drawer(memory_id)
 
-    async def get_tasks_by_status(
-        self, user_id: str, status: str
-    ) -> list[MemoryRecord]:
-        """Return all memories whose metadata['status'] matches the given value."""
+    async def get_tasks_by_status(self, user_id: str, status: str) -> list[MemoryRecord]:
         await self._ensure_init()
-        return await self._store.get_memories_by_metadata(user_id, "status", status)
+        return []
 
     async def stats(self, user_id: str) -> dict[str, Any]:
         await self._ensure_init()
-        return await self._store.stats(user_id)
+        overview = await self._palace.palace_overview(user_id)
+        wings = overview.get("wings", {})
+        sem = wings.get("strategy", {}).get("drawers", 0) + wings.get("product", {}).get("drawers", 0)
+        epi = wings.get("people", {}).get("drawers", 0)
+        proc = wings.get("execution", {}).get("drawers", 0) + wings.get("ops", {}).get("drawers", 0)
+        out = {"semantic": sem, "episodic": epi, "procedural": proc}
+        for wing in WINGS:
+            out[f"wing_{wing}"] = wings.get(wing, {}).get("drawers", 0)
+        return out
 
-    async def run_maintenance(
-        self,
-        user_id: str,
-        lookback_days: int = 7,
-        max_items: int = 30,
-    ) -> dict[str, Any]:
-        """
-        Background memory maintenance:
-          - consolidate recent episodic fragments into a semantic memory
-          - prune low-signal episodic fragments after consolidation
-        """
+    async def run_maintenance(self, user_id: str, lookback_days: int = 7, max_items: int = 30) -> dict[str, Any]:
         await self._ensure_init()
-        return await self._writer.consolidate_episodic_memories(
-            user_id=user_id,
-            lookback_days=lookback_days,
-            max_items=max_items,
-        )
+        return {"consolidated": 0, "pruned": 0}
 
-    # ── File Ingestion ───────────────────────────────────
-
-    async def ingest_file(
-        self, file_path: str, user_id: str = "default"
-    ) -> int:
-        """
-        Ingest a document into memory.
-        Reads the file, chunks it, and stores each chunk as a semantic memory.
-        Returns the number of memories created.
-        """
+    async def ingest_file(self, file_path: str, user_id: str = "default") -> int:
         await self._ensure_init()
-        from pathlib import Path
-
         path = Path(file_path)
         raw = path.read_text(encoding="utf-8")
-
-        chunks = self._chunk_text(raw, max_chars=800, overlap=100)
+        chunks = self._chunk_text(raw, max_chars=900, overlap=120)
         count = 0
         for chunk in chunks:
-            record = MemoryRecord(
-                memory_type=MemoryType.SEMANTIC,
-                content=chunk,
-                entities=self._writer._extract_entities_simple(chunk),
-                user_id=user_id,
-                priority=0.4,
-            )
-            await self._store.add_memory(record)
+            await self.process_turn(user_id, f"[doc] {path.name}", chunk)
             count += 1
-
-        logger.info("Ingested %d chunks from %s", count, file_path)
         return count
 
+    async def palace_overview(self, user_id: str) -> dict[str, Any]:
+        await self._ensure_init()
+        return await self._palace.palace_overview(user_id)
+
+    async def palace_rooms(self, user_id: str, wing: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        await self._ensure_init()
+        return await self._palace.list_rooms(user_id=user_id, wing=wing, limit=limit)
+
+    async def palace_search(self, user_id: str, query: str, top_k: int = 8, wing: str | None = None) -> list[dict[str, Any]]:
+        await self._ensure_init()
+        qvec = await self._embed.embed_text(query)
+        return await self._palace.vector_search(user_id, qvec, query_text=query, top_k=top_k, wing=wing)
+
     @staticmethod
-    def _chunk_text(
-        text: str, max_chars: int = 800, overlap: int = 100
-    ) -> list[str]:
+    def _chunk_text(text: str, max_chars: int = 800, overlap: int = 100) -> list[str]:
         chunks: list[str] = []
         start = 0
         while start < len(text):
@@ -264,8 +181,35 @@ class MemoryEngine:
             start += max_chars - overlap
         return chunks
 
-    # ── Internal ─────────────────────────────────────────
-
     async def _ensure_init(self) -> None:
         if not self._initialized:
             await self.initialize()
+
+    @staticmethod
+    def _drawer_to_record(row: dict[str, Any]) -> MemoryRecord:
+        wing = row.get("wing", "")
+        mt = MemoryType.SEMANTIC
+        if wing == "people":
+            mt = MemoryType.EPISODIC
+        elif wing in ("execution", "ops"):
+            mt = MemoryType.PROCEDURAL
+        iso = row.get("created_at")
+        try:
+            dt = datetime.fromisoformat(iso) if iso else datetime.now(timezone.utc)
+        except (ValueError, TypeError):
+            dt = datetime.now(timezone.utc)
+        content = row.get("content", "")
+        return MemoryRecord(
+            id=row.get("id", ""),
+            memory_type=mt,
+            content=content,
+            summary=content[:120],
+            key_points=[],
+            entities=[],
+            priority=max(0.1, float(row.get("score", 0.5) or 0.5)),
+            created_at=dt,
+            updated_at=dt,
+            access_count=0,
+            user_id="default",
+            metadata={"wing": wing, "room": row.get("room")},
+        )

@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     DEEPSEEK_API_KEY: str = ""
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
     DEEPSEEK_MODEL: str = "deepseek-chat"
+    EMBEDDING_API_KEY: str = ""
+    EMBEDDING_BASE_URL: str = "https://api.deepseek.com"
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_DIM: int = 1536
 
     # --- Auth ---
     API_KEY_OWNER: str = ""
@@ -43,6 +47,8 @@ class Settings(BaseSettings):
 
     # --- Memory System ---
     MEMORY_DB_PATH: str = "my_agent_os/memory_layer/data/memory.db"
+    MEMORY_V2_DB_PATH: str = "my_agent_os/memory_layer/data/memory_v2.db"
+    MEMORY_V2_ENABLED: bool = True
     MEMORY_RETRIEVAL_TOP_K: int = 5
     MEMORY_PRIORITY_DECAY_DAYS: float = 7.0
     MEMORY_MAX_INJECTION_CHARS: int = 2000

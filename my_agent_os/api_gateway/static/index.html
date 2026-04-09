@@ -276,6 +276,122 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .mem-stat-chip.ep .sn{color:var(--mem-ep)}
 .mem-stat-chip.proc .sn{color:var(--mem-proc)}
 
+.mem-tabs{
+  display:flex;
+  gap:6px;
+  border-bottom:1px solid var(--border-dim);
+  padding:8px 12px;
+}
+.mem-tab{
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:transparent;
+  color:var(--text-dim);
+  font-size:11px;
+  padding:3px 10px;
+  cursor:pointer;
+}
+.mem-tab.active{
+  color:var(--accent);
+  border-color:var(--accent);
+}
+
+#palace-overview{
+  border-bottom:1px solid var(--border-dim);
+  padding:8px 12px;
+  display:grid;
+  grid-template-columns:1fr;
+  gap:6px;
+  max-height:180px;
+  overflow:auto;
+}
+.palace-wing{
+  border:1px solid var(--border-dim);
+  border-radius:var(--radius-sm);
+  padding:7px 9px;
+  background:var(--bg);
+}
+.palace-wing .w-title{
+  font-size:10px;
+  color:var(--text-dim);
+  font-family:var(--mono);
+  text-transform:uppercase;
+  margin-bottom:3px;
+}
+.palace-wing .w-meta{font-size:11px;color:var(--text)}
+.palace-wing .w-line{
+  font-size:10px;
+  color:var(--text-muted);
+  margin-top:3px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+#palace-view{
+  flex:1;
+  display:none;
+  overflow:auto;
+}
+#palace-view.active{display:block}
+.palace-controls{
+  padding:10px 12px;
+  border-bottom:1px solid var(--border-dim);
+  display:flex;
+  gap:6px;
+}
+#palace-query{
+  flex:1;
+  min-width:0;
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:var(--surface);
+  color:var(--text);
+  padding:6px 8px;
+  font-size:12px;
+}
+#palace-wing{
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:var(--surface);
+  color:var(--text);
+  padding:6px 8px;
+  font-size:12px;
+}
+#palace-run{
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:transparent;
+  color:var(--text-dim);
+  padding:6px 10px;
+  font-size:12px;
+  cursor:pointer;
+}
+#palace-run:hover{color:var(--text);border-color:var(--accent)}
+#palace-rooms,#palace-results{padding:8px 12px;border-bottom:1px solid var(--border-dim)}
+.palace-sec-title{
+  font-size:10px;
+  font-family:var(--mono);
+  color:var(--text-muted);
+  text-transform:uppercase;
+  margin-bottom:6px;
+}
+.palace-room,.palace-hit{
+  border:1px solid var(--border-dim);
+  border-radius:var(--radius-sm);
+  padding:7px 8px;
+  margin-bottom:6px;
+  background:var(--bg);
+}
+.palace-room .meta,.palace-hit .meta{font-size:10px;color:var(--text-muted)}
+.palace-room .name,.palace-hit .name{font-size:12px;color:var(--text)}
+.palace-hit .snippet{
+  font-size:11px;
+  color:var(--text-dim);
+  margin-top:3px;
+  line-height:1.45;
+}
+
 /* ─── Map canvas ─────────────────────────────────── */
 #map-scroll{flex:1;overflow:auto;position:relative}
 #map-scroll::-webkit-scrollbar{width:4px;height:4px}
@@ -442,6 +558,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
       <div class="legend-item"><div class="legend-dot" style="background:var(--mem-proc)"></div>Procedural</div>
     </div>
 
+    <div class="mem-tabs">
+      <button id="mem-tab-map" class="mem-tab active" onclick="setMemMode('map')">Map</button>
+      <button id="mem-tab-palace" class="mem-tab" onclick="setMemMode('palace')">Palace</button>
+    </div>
+
+    <div id="palace-overview"></div>
+
     <div id="map-scroll">
       <div id="map-container">
         <svg id="connections-svg"></svg>
@@ -451,6 +574,23 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
           <div style="font-size:11px;opacity:.6">Chat to build your memory network</div>
         </div>
       </div>
+    </div>
+
+    <div id="palace-view">
+      <div class="palace-controls">
+        <input id="palace-query" type="text" placeholder="Search memory palace...">
+        <select id="palace-wing">
+          <option value="">All wings</option>
+          <option value="strategy">strategy</option>
+          <option value="execution">execution</option>
+          <option value="product">product</option>
+          <option value="ops">ops</option>
+          <option value="people">people</option>
+        </select>
+        <button id="palace-run" onclick="runPalaceSearch()">Go</button>
+      </div>
+      <div id="palace-rooms"></div>
+      <div id="palace-results"></div>
     </div>
   </aside>
 </div>
@@ -468,6 +608,7 @@ const STORAGE_KEY = 'agentos_sessions';
 let sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 let activeSessionId = null;
 let activeMessages = [];  // [{role, content, actions, crewViews}]
+let memMode = 'map';
 
 // ── DOM refs ──────────────────────────────────────
 const messagesEl  = document.getElementById('messages');
@@ -480,12 +621,27 @@ const keyInput    = document.getElementById('api-key-input');
 const authDot     = document.getElementById('auth-dot');
 const sidebar     = document.getElementById('sidebar');
 const sessionList = document.getElementById('session-list');
+const mapScrollEl = document.getElementById('map-scroll');
+const palaceViewEl= document.getElementById('palace-view');
+const palaceQueryEl = document.getElementById('palace-query');
+const palaceWingEl = document.getElementById('palace-wing');
 
 // ── Init ──────────────────────────────────────────
 keyInput.value = localStorage.getItem('agentos_key') || '';
 keyInput.addEventListener('input', () => {
   localStorage.setItem('agentos_key', keyInput.value);
   authDot.className = '';
+});
+palaceQueryEl?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    runPalaceSearch();
+  }
+});
+palaceWingEl?.addEventListener('change', () => {
+  if (memPanel.classList.contains('open') && memMode === 'palace') {
+    refreshPalaceRooms();
+  }
 });
 
 function apiHeaders() {
@@ -561,7 +717,23 @@ function toggleSidebar() {
 function toggleMemPanel() {
   const open = memPanel.classList.toggle('open');
   memToggleBtn.classList.toggle('active', open);
-  if (open) refreshMemMap();
+  if (open) refreshMemoryPanel();
+}
+
+function setMemMode(mode) {
+  memMode = mode === 'palace' ? 'palace' : 'map';
+  document.getElementById('mem-tab-map').classList.toggle('active', memMode === 'map');
+  document.getElementById('mem-tab-palace').classList.toggle('active', memMode === 'palace');
+  mapScrollEl.style.display = memMode === 'map' ? 'block' : 'none';
+  palaceViewEl.classList.toggle('active', memMode === 'palace');
+  if (memPanel.classList.contains('open')) refreshMemoryPanel();
+}
+
+function refreshMemoryPanel() {
+  refreshMemMap();
+  if (memMode === 'palace') {
+    refreshPalaceRooms();
+  }
 }
 
 async function sealSession() {
@@ -749,7 +921,7 @@ async function send() {
     document.getElementById('chat-title').textContent = text.slice(0, 45) || 'Agent OS';
 
     if (memPanel.classList.contains('open')) {
-      setTimeout(refreshMemMap, 2000);
+      setTimeout(refreshMemoryPanel, 2000);
     }
   } catch(e) {
     hideTyping();
@@ -772,14 +944,19 @@ const ROW_PAD = 22;  // padding on each side of row
 async function refreshMemMap() {
   try {
     const h = apiHeaders();
-    const [sRes, lRes] = await Promise.all([
+    const [sRes, lRes, pRes] = await Promise.all([
       fetch('/memory/stats', {headers:h}),
       fetch('/memory/list?limit=48', {headers:h}),
+      fetch('/memory/palace/overview', {headers:h}),
     ]);
     if (!sRes.ok || !lRes.ok) return;
 
     const stats    = await sRes.json();
     const memories = await lRes.json();
+    if (pRes.ok) {
+      const palace = await pRes.json();
+      renderPalaceOverview(palace);
+    }
 
     document.getElementById('stat-sem').textContent  = stats.semantic   || 0;
     document.getElementById('stat-ep').textContent   = stats.episodic   || 0;
@@ -788,6 +965,72 @@ async function refreshMemMap() {
     document.getElementById('map-empty').style.display = memories.length ? 'none' : 'flex';
     renderMemMap(memories);
   } catch(e) { console.warn('Memory refresh:', e); }
+}
+
+function renderPalaceOverview(data) {
+  const wrap = document.getElementById('palace-overview');
+  if (!wrap) return;
+  const wings = data?.wings || {};
+  const order = ['strategy', 'execution', 'product', 'ops', 'people'];
+  const blocks = order.map(w => {
+    const it = wings[w] || {};
+    const rooms = it.rooms || 0;
+    const drawers = it.drawers || 0;
+    const preview = (it.recent && it.recent.length) ? (it.recent[0].content || '') : 'No recent drawers';
+    return `<div class="palace-wing">
+      <div class="w-title">${esc(w)}</div>
+      <div class="w-meta">${drawers} drawers · ${rooms} rooms</div>
+      <div class="w-line">${esc(preview)}</div>
+    </div>`;
+  });
+  wrap.innerHTML = blocks.join('');
+}
+
+async function refreshPalaceRooms() {
+  const box = document.getElementById('palace-rooms');
+  if (!box) return;
+  try {
+    const wing = palaceWingEl?.value || '';
+    const q = wing ? `?wing=${encodeURIComponent(wing)}&limit=20` : '?limit=20';
+    const r = await fetch(`/memory/palace/rooms${q}`, {headers: apiHeaders()});
+    if (!r.ok) return;
+    const rows = await r.json();
+    const items = rows.map(it => `<div class="palace-room">
+      <div class="name">${esc(it.name)}</div>
+      <div class="meta">${esc(it.wing)} · ${it.drawers} drawers</div>
+    </div>`);
+    box.innerHTML = `<div class="palace-sec-title">Rooms</div>${items.join('') || '<div class="palace-room"><div class="meta">No rooms yet</div></div>'}`;
+  } catch(e) {
+    console.warn('Palace rooms refresh:', e);
+  }
+}
+
+async function runPalaceSearch() {
+  const query = palaceQueryEl?.value?.trim() || '';
+  const wing = palaceWingEl?.value || null;
+  const box = document.getElementById('palace-results');
+  if (!box) return;
+  if (!query) {
+    box.innerHTML = `<div class="palace-sec-title">Results</div><div class="palace-hit"><div class="meta">Type a query to search embeddings</div></div>`;
+    return;
+  }
+  try {
+    const r = await fetch('/memory/palace/search', {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify({ query, top_k: 12, wing }),
+    });
+    if (!r.ok) return;
+    const hits = await r.json();
+    const items = hits.map(h => `<div class="palace-hit">
+      <div class="name">${esc(h.wing)}/${esc(h.room)} · ${esc(h.role)} · score ${Number(h.score || 0).toFixed(3)}</div>
+      <div class="meta">vector ${Number(h.vector_score || 0).toFixed(3)} · lexical ${Number(h.lexical_score || 0).toFixed(3)}</div>
+      <div class="snippet">${esc((h.content || '').slice(0, 220))}</div>
+    </div>`);
+    box.innerHTML = `<div class="palace-sec-title">Results</div>${items.join('') || '<div class="palace-hit"><div class="meta">No hits</div></div>'}`;
+  } catch(e) {
+    console.warn('Palace search failed:', e);
+  }
 }
 
 function renderMemMap(memories) {
@@ -996,7 +1239,7 @@ function positionTooltip(cx, cy) {
 
 // Redraw map on panel resize
 const resizeObs = new ResizeObserver(() => {
-  if (memPanel.classList.contains('open')) refreshMemMap();
+  if (memPanel.classList.contains('open')) refreshMemoryPanel();
 });
 resizeObs.observe(document.getElementById('map-scroll'));
 
