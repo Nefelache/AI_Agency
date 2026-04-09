@@ -9,6 +9,7 @@ Includes:
 
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from fastapi import APIRouter, Depends
 from my_agent_os.auth.dependencies import get_auth_context
 from my_agent_os.auth.models import AuthContext
 from my_agent_os.config.settings import settings
+from my_agent_os.skills_layer.tools import list_tools
 from my_agent_os.version import __version__ as APP_VERSION
 
 router = APIRouter()
@@ -62,4 +64,22 @@ async def whatsapp_bridge_heartbeat() -> dict:
     global _bridge_last_seen
     _bridge_last_seen = time.time()
     return {"ok": True}
+
+
+@router.get("/health/skills")
+async def health_skills(auth: AuthContext = Depends(get_auth_context)) -> dict:
+    tools = list_tools()
+    providers = {
+        "tavily_configured": bool(os.getenv("TAVILY_API_KEY")),
+        "serpapi_configured": bool(os.getenv("SERPAPI_KEY")),
+        "notion_configured": bool(os.getenv("NOTION_API_KEY")),
+        "web_search_allow_ddg": os.getenv("WEB_SEARCH_ALLOW_DDG", "1") == "1",
+    }
+    return {
+        "status": "ok",
+        "skill_count": len(tools),
+        "skills": tools,
+        "providers": providers,
+        "auth": {"user_id": auth.user_id, "role": auth.role.value},
+    }
 

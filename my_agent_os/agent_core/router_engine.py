@@ -20,6 +20,7 @@ from typing import Any
 
 from my_agent_os.agent_core.llm_client import call_llm
 from my_agent_os.auth.sanitizer import sanitize_output
+from my_agent_os.skills_layer.base import normalize_skill_result
 from my_agent_os.skills_layer.tools import get_tool, list_tools
 
 logger = logging.getLogger(__name__)
@@ -309,6 +310,30 @@ async def _try_skill_dispatch(
     tools = list_tools()
     if not tools:
         return None
+    tool_names = {t["name"] for t in tools}
+
+    direct = _try_direct_skill_route(raw_input, tool_names)
+    if direct:
+        skill_name, params = direct
+        try:
+            tool = get_tool(skill_name)
+            raw_result = await tool.execute(params)
+            skill = normalize_skill_result(raw_result if isinstance(raw_result, dict) else {"success": False, "reason": "Skill returned non-dict payload"})
+            output = skill.get("output") or skill.get("message") or ""
+            if not skill.get("ok", False):
+                output = _format_skill_error_for_user(skill_name, skill)
+            return {
+                "answer": output,
+                "sources": None,
+                "next_actions": _skill_next_actions(skill),
+                "skill_used": skill_name,
+                "skill_ok": bool(skill.get("ok", False)),
+                "skill_code": skill.get("code"),
+                "skill_provider": skill.get("provider"),
+                "route_path": "skill:direct",
+            }
+        except Exception as e:
+            logger.warning("Direct skill route failed [%s]: %s", skill_name, e)
 
     tool_list = "\n".join(f'  "{t["name"]}": {t["description"]}' for t in tools)
     classifier_system = (
@@ -335,21 +360,25 @@ async def _try_skill_dispatch(
         params     = data.get("params", {})
 
         try:
-            tool   = get_tool(skill_name)
-            result = await tool.execute(params)
+            tool = get_tool(skill_name)
+            raw_result = await tool.execute(params)
+            skill = normalize_skill_result(raw_result if isinstance(raw_result, dict) else {"success": False, "reason": "Skill returned non-dict payload"})
         except KeyError:
             return None
 
-        output = result.get("output") or str(result)
-        if not result.get("success", True):
-            reason = result.get("reason", "Unknown error")
-            output = f"[{skill_name}] failed: {reason}"
+        output = skill.get("output") or skill.get("message") or ""
+        if not skill.get("ok", False):
+            output = _format_skill_error_for_user(skill_name, skill)
 
         return {
-            "answer":       output,
-            "sources":      None,
-            "next_actions": [],
-            "skill_used":   skill_name,
+            "answer": output,
+            "sources": None,
+            "next_actions": _skill_next_actions(skill),
+            "skill_used": skill_name,
+            "skill_ok": bool(skill.get("ok", False)),
+            "skill_code": skill.get("code"),
+            "skill_provider": skill.get("provider"),
+            "route_path": "skill:llm-dispatch",
         }
     except KeyError:
         return None
@@ -394,3 +423,57 @@ def _normalize_str_list(items: Any) -> list[str]:
         else:
             result.append(str(item))
     return result
+
+
+def _try_direct_skill_route(raw_input: str, tool_names: set[str]) -> tuple[str, dict[str, Any]] | None:
+    text = (raw_input or "").strip()
+    low = text.lower()
+
+    # Deterministic routing for web search avoids LLM misclassification drift.
+    if "web_search" in tool_names:
+        markers = ("上网搜索", "搜索", "search ", "search:")
+        if any(m in low for m in markers):
+            query = text
+            replacements = ["上网搜索", "帮我搜索", "请搜索", "搜索", "search:", "search "]
+            for rep in replacements:
+                query = query.replace(rep, " ")
+            query = query.strip(" ：:，,。.!?！？")
+            if not query:
+                query = text
+            return ("web_search", {"query": query, "num_results": 5})
+    return None
+
+
+def _format_skill_error_for_user(skill_name: str, skill: dict[str, Any]) -> str:
+    code = str(skill.get("code", "SKILL_FAILED"))
+    message = str(skill.get("message", "Skill execution failed."))
+    provider = skill.get("provider")
+    provider_hint = f" Provider: {provider}." if provider else ""
+    if code == "EMPTY_RESULT":
+        return f"[{skill_name}] No external results were found.{provider_hint}"
+    if code == "PROVIDER_TIMEOUT":
+        return f"[{skill_name}] Search provider timed out.{provider_hint} Please retry."
+    if code in ("PROVIDER_RATE_LIMIT", "RATE_LIMIT"):
+        return f"[{skill_name}] Rate limit reached.{provider_hint} Wait and retry."
+    if code == "NO_PROVIDER":
+        return f"[{skill_name}] Search provider is not configured.{provider_hint} Configure API keys in .env."
+    if code == "AUTH_ERROR":
+        return f"[{skill_name}] Provider authentication failed.{provider_hint} Check API key."
+    if code == "PROVIDER_ERROR":
+        return f"[{skill_name}] Provider request failed.{provider_hint} {message}"
+    return f"[{skill_name}] failed: {message}"
+
+
+def _skill_next_actions(skill: dict[str, Any]) -> list[str]:
+    if skill.get("ok", False):
+        return []
+    code = str(skill.get("code", "SKILL_FAILED"))
+    if code in ("PROVIDER_TIMEOUT", "PROVIDER_RATE_LIMIT", "RATE_LIMIT"):
+        return ["Retry in a moment", "Use a narrower query"]
+    if code == "NO_PROVIDER":
+        return ["Configure search API key", "Retry after deploy"]
+    if code == "AUTH_ERROR":
+        return ["Check provider API key", "Retry request"]
+    if code == "EMPTY_RESULT":
+        return ["Try broader keywords", "Try English + Chinese keywords"]
+    return ["Try rephrasing", "Check skill configuration"]

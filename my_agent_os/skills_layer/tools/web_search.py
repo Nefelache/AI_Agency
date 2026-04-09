@@ -7,13 +7,13 @@ Web Search — real-time web search with provider priority:
 
 from __future__ import annotations
 
-import json
 import os
-import urllib.parse
-import urllib.request
 from typing import Any
 
+import httpx
+
 from my_agent_os.skills_layer.base import Skill
+from my_agent_os.skills_layer.base import skill_err, skill_ok
 from my_agent_os.skills_layer.tools import register
 
 
@@ -24,120 +24,195 @@ class WebSearch(Skill):
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         query = params.get("query", "").strip()
-        num   = int(params.get("num_results", 5))
+        num = max(1, min(int(params.get("num_results", 5)), 10))
         if not query:
-            return {"success": False, "reason": "Missing 'query'."}
+            return skill_err("INVALID_PARAMS", "Missing 'query'.")
 
-        tavily_key  = os.getenv("TAVILY_API_KEY", "")
+        tavily_key = os.getenv("TAVILY_API_KEY", "")
         serpapi_key = os.getenv("SERPAPI_KEY", "")
+        allow_ddg = os.getenv("WEB_SEARCH_ALLOW_DDG", "1") == "1"
         if tavily_key:
-            return self._tavily_search(query, num, tavily_key)
+            return await self._tavily_search(query, num, tavily_key)
         if serpapi_key:
-            return self._serpapi_search(query, num, serpapi_key)
-        return self._ddg_search(query, num)
+            return await self._serpapi_search(query, num, serpapi_key)
+        if not allow_ddg:
+            return skill_err(
+                "NO_PROVIDER",
+                "No search provider configured. Set TAVILY_API_KEY or SERPAPI_KEY.",
+                provider="none",
+            )
+        return await self._ddg_search(query, num)
 
     # ── Tavily (recommended — AI-optimised search) ───────────────
-    def _tavily_search(self, query: str, num: int, key: str) -> dict[str, Any]:
+    async def _tavily_search(self, query: str, num: int, key: str) -> dict[str, Any]:
         try:
-            payload = json.dumps({
+            payload = {
                 "api_key": key,
                 "query": query,
                 "search_depth": "basic",
                 "max_results": num,
                 "include_answer": True,
-            }).encode()
-            req = urllib.request.Request(
-                "https://api.tavily.com/search",
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode())
+            }
+            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=5.0)) as client:
+                resp = await client.post("https://api.tavily.com/search", json=payload)
+                resp.raise_for_status()
+                data = resp.json()
 
             results = [
                 {
-                    "title":   r.get("title", ""),
+                    "title": r.get("title", ""),
                     "snippet": r.get("content", "")[:300],
-                    "url":     r.get("url", ""),
+                    "url": r.get("url", ""),
                 }
                 for r in data.get("results", [])[:num]
             ]
             direct_answer = data.get("answer", "")
-            output = _format_results(query, results)
+            if not results:
+                return skill_err(
+                    "EMPTY_RESULT",
+                    f"No web results found for: {query}",
+                    output=f"No results found for: {query}",
+                    provider="tavily",
+                )
+            output = _format_results(query, results, provider="tavily")
             if direct_answer:
                 output = f"Direct answer: {direct_answer}\n\n{output}"
-            return {"success": True, "query": query, "results": results, "output": output}
+            return skill_ok(
+                message=f"Found {len(results)} web results.",
+                output=output,
+                data={"query": query, "results": results},
+                provider="tavily",
+            )
+        except httpx.TimeoutException:
+            return skill_err("PROVIDER_TIMEOUT", "Tavily request timed out.", retryable=True, provider="tavily")
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code if e.response else None
+            if status == 429:
+                return skill_err("PROVIDER_RATE_LIMIT", "Tavily rate limit reached.", retryable=True, provider="tavily")
+            return skill_err(
+                "PROVIDER_ERROR",
+                f"Tavily HTTP {status or 'error'}",
+                retryable=bool(status and status >= 500),
+                provider="tavily",
+            )
         except Exception as e:
-            return {"success": False, "reason": str(e)}
+            return skill_err("PROVIDER_ERROR", str(e), retryable=True, provider="tavily")
 
     # ── DuckDuckGo Instant Answer (zero-key fallback) ────────────
-    def _ddg_search(self, query: str, num: int) -> dict[str, Any]:
+    async def _ddg_search(self, query: str, num: int) -> dict[str, Any]:
         try:
-            q = urllib.parse.quote_plus(query)
-            url = f"https://api.duckduckgo.com/?q={q}&format=json&no_redirect=1&no_html=1&skip_disambig=1"
-            req = urllib.request.Request(url, headers={"User-Agent": "AgentOS/1.0"})
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read().decode())
+            url = "https://api.duckduckgo.com/"
+            params = {
+                "q": query,
+                "format": "json",
+                "no_redirect": 1,
+                "no_html": 1,
+                "skip_disambig": 1,
+            }
+            async with httpx.AsyncClient(timeout=httpx.Timeout(8.0, connect=4.0)) as client:
+                resp = await client.get(url, params=params, headers={"User-Agent": "AgentOS/1.0"})
+                resp.raise_for_status()
+                data = resp.json()
 
             results = []
             abstract = data.get("AbstractText", "")
             if abstract:
                 results.append({
-                    "title":   data.get("Heading", query),
+                    "title": data.get("Heading", query),
                     "snippet": abstract[:400],
-                    "url":     data.get("AbstractURL", ""),
+                    "url": data.get("AbstractURL", ""),
                 })
 
             for topic in data.get("RelatedTopics", [])[:num]:
                 if isinstance(topic, dict) and topic.get("Text"):
                     results.append({
-                        "title":   topic.get("Text", "")[:80],
+                        "title": topic.get("Text", "")[:80],
                         "snippet": topic.get("Text", "")[:300],
-                        "url":     topic.get("FirstURL", ""),
+                        "url": topic.get("FirstURL", ""),
                     })
-
-            return {
-                "success": True,
-                "query":   query,
-                "results": results[:num],
-                "output":  _format_results(query, results[:num]),
-            }
+            results = results[:num]
+            if not results:
+                return skill_err(
+                    "EMPTY_RESULT",
+                    f"No web results found for: {query}",
+                    output=f"No results found for: {query}",
+                    provider="duckduckgo",
+                )
+            return skill_ok(
+                message=f"Found {len(results)} web results.",
+                output=_format_results(query, results, provider="duckduckgo"),
+                data={"query": query, "results": results},
+                provider="duckduckgo",
+            )
+        except httpx.TimeoutException:
+            return skill_err("PROVIDER_TIMEOUT", "DuckDuckGo request timed out.", retryable=True, provider="duckduckgo")
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code if e.response else None
+            if status == 429:
+                return skill_err("PROVIDER_RATE_LIMIT", "DuckDuckGo rate limit reached.", retryable=True, provider="duckduckgo")
+            return skill_err(
+                "PROVIDER_ERROR",
+                f"DuckDuckGo HTTP {status or 'error'}",
+                retryable=bool(status and status >= 500),
+                provider="duckduckgo",
+            )
         except Exception as e:
-            return {"success": False, "reason": str(e)}
+            return skill_err("PROVIDER_ERROR", str(e), retryable=True, provider="duckduckgo")
 
     # ── SerpAPI (optional, richer results) ──────────────────────
-    def _serpapi_search(self, query: str, num: int, key: str) -> dict[str, Any]:
+    async def _serpapi_search(self, query: str, num: int, key: str) -> dict[str, Any]:
         try:
-            q   = urllib.parse.quote_plus(query)
-            url = f"https://serpapi.com/search.json?q={q}&num={num}&api_key={key}"
-            req = urllib.request.Request(url, headers={"User-Agent": "AgentOS/1.0"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode())
+            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=5.0)) as client:
+                resp = await client.get(
+                    "https://serpapi.com/search.json",
+                    params={"q": query, "num": num, "api_key": key},
+                    headers={"User-Agent": "AgentOS/1.0"},
+                )
+                resp.raise_for_status()
+                data = resp.json()
 
             organics = data.get("organic_results", [])
             results = [
                 {
-                    "title":   r.get("title", ""),
+                    "title": r.get("title", ""),
                     "snippet": r.get("snippet", ""),
-                    "url":     r.get("link", ""),
+                    "url": r.get("link", ""),
                 }
                 for r in organics[:num]
             ]
-            return {
-                "success": True,
-                "query":   query,
-                "results": results,
-                "output":  _format_results(query, results),
-            }
+            if not results:
+                return skill_err(
+                    "EMPTY_RESULT",
+                    f"No web results found for: {query}",
+                    output=f"No results found for: {query}",
+                    provider="serpapi",
+                )
+            return skill_ok(
+                message=f"Found {len(results)} web results.",
+                output=_format_results(query, results, provider="serpapi"),
+                data={"query": query, "results": results},
+                provider="serpapi",
+            )
+        except httpx.TimeoutException:
+            return skill_err("PROVIDER_TIMEOUT", "SerpAPI request timed out.", retryable=True, provider="serpapi")
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code if e.response else None
+            if status == 429:
+                return skill_err("PROVIDER_RATE_LIMIT", "SerpAPI rate limit reached.", retryable=True, provider="serpapi")
+            return skill_err(
+                "PROVIDER_ERROR",
+                f"SerpAPI HTTP {status or 'error'}",
+                retryable=bool(status and status >= 500),
+                provider="serpapi",
+            )
         except Exception as e:
-            return {"success": False, "reason": str(e)}
+            return skill_err("PROVIDER_ERROR", str(e), retryable=True, provider="serpapi")
 
 
-def _format_results(query: str, results: list[dict]) -> str:
+def _format_results(query: str, results: list[dict], *, provider: str) -> str:
     if not results:
         return f"No results found for: {query}"
-    lines = [f"Search results for: {query}\n"]
+    lines = [f"Search results for: {query} ({provider})\n"]
     for i, r in enumerate(results, 1):
         lines.append(f"{i}. {r['title']}\n   {r['snippet']}\n   {r['url']}")
     return "\n".join(lines)
