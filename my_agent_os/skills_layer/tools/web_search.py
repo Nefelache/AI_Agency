@@ -13,9 +13,25 @@ from typing import Any
 
 import httpx
 
+from my_agent_os.config.settings import settings
 from my_agent_os.skills_layer.base import Skill
 from my_agent_os.skills_layer.base import skill_err, skill_ok
 from my_agent_os.skills_layer.tools import register
+
+
+def _env_or_settings(key: str, fallback: str = "") -> str:
+    """Process env wins (tests/Docker env:); else Pydantic-loaded .env file values."""
+    v = os.getenv(key)
+    if v is not None and str(v).strip() != "":
+        return str(v).strip()
+    return (getattr(settings, key, fallback) or fallback).strip()
+
+
+def _allow_ddg() -> bool:
+    raw = os.getenv("WEB_SEARCH_ALLOW_DDG")
+    if raw is None:
+        raw = getattr(settings, "WEB_SEARCH_ALLOW_DDG", "1") or "1"
+    return str(raw).strip() == "1"
 
 _SEARCH_DIAGNOSTICS: dict[str, Any] = {
     "total_requests": 0,
@@ -43,9 +59,9 @@ class WebSearch(Skill):
             return skill_err("INVALID_PARAMS", "Missing 'query'.")
 
         _SEARCH_DIAGNOSTICS["total_requests"] = int(_SEARCH_DIAGNOSTICS.get("total_requests", 0)) + 1
-        tavily_key = os.getenv("TAVILY_API_KEY", "")
-        serpapi_key = os.getenv("SERPAPI_KEY", "")
-        allow_ddg = os.getenv("WEB_SEARCH_ALLOW_DDG", "1") == "1"
+        tavily_key = _env_or_settings("TAVILY_API_KEY")
+        serpapi_key = _env_or_settings("SERPAPI_KEY")
+        allow_ddg = _allow_ddg()
 
         providers: list[tuple[str, Any]] = []
         if tavily_key:

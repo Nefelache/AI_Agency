@@ -70,11 +70,16 @@ async def whatsapp_bridge_heartbeat() -> dict:
 @router.get("/health/skills")
 async def health_skills(auth: AuthContext = Depends(get_auth_context)) -> dict:
     tools = list_tools()
+    tavily = (os.getenv("TAVILY_API_KEY") or settings.TAVILY_API_KEY or "").strip()
+    serpapi = (os.getenv("SERPAPI_KEY") or settings.SERPAPI_KEY or "").strip()
+    ddg_raw = os.getenv("WEB_SEARCH_ALLOW_DDG")
+    if ddg_raw is None:
+        ddg_raw = settings.WEB_SEARCH_ALLOW_DDG or "1"
     providers = {
-        "tavily_configured": bool(os.getenv("TAVILY_API_KEY")),
-        "serpapi_configured": bool(os.getenv("SERPAPI_KEY")),
+        "tavily_configured": bool(tavily),
+        "serpapi_configured": bool(serpapi),
         "notion_configured": bool(os.getenv("NOTION_API_KEY")),
-        "web_search_allow_ddg": os.getenv("WEB_SEARCH_ALLOW_DDG", "1") == "1",
+        "web_search_allow_ddg": str(ddg_raw).strip() == "1",
     }
     return {
         "status": "ok",

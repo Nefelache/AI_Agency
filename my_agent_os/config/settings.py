@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     DEEPSEEK_API_KEY: str = ""
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
     DEEPSEEK_MODEL: str = "deepseek-chat"
+    # Web search (read from same .env as other keys; skills also honor process env override)
+    TAVILY_API_KEY: str = ""
+    SERPAPI_KEY: str = ""
+    WEB_SEARCH_ALLOW_DDG: str = "1"
     EMBEDDING_API_KEY: str = ""
     EMBEDDING_BASE_URL: str = "https://api.deepseek.com"
     EMBEDDING_MODEL: str = "text-embedding-3-small"
