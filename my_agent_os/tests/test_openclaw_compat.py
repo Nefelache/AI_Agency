@@ -152,6 +152,13 @@ def test_websocket_channels_status_and_config(api_client: TestClient, openclaw_t
         assert m5["ok"] is True
         assert m5["payload"]["logs"] == []
 
+        ws.send_json({"type": "req", "id": "r6", "method": "sessions.seal", "params": {"key": "main"}})
+        m6 = ws.receive_json()
+        assert m6["ok"] is True
+        assert m6["payload"]["ok"] is True
+        assert m6["payload"]["key"] == "main"
+        assert "sealedAt" in m6["payload"]
+
 
 def test_tail_gateway_logs_empty_dir(tmp_path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("my_agent_os.enterprise.audit.audit_dir", lambda: tmp_path)

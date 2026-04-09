@@ -8,6 +8,7 @@ Web Search — real-time web search with provider priority:
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 import httpx
@@ -15,6 +16,18 @@ import httpx
 from my_agent_os.skills_layer.base import Skill
 from my_agent_os.skills_layer.base import skill_err, skill_ok
 from my_agent_os.skills_layer.tools import register
+
+_SEARCH_DIAGNOSTICS: dict[str, Any] = {
+    "total_requests": 0,
+    "last_success_provider": None,
+    "last_success_ts": None,
+    "last_failure": None,
+}
+
+
+def get_web_search_diagnostics() -> dict[str, Any]:
+    """Expose lightweight runtime diagnostics for /health endpoints."""
+    return dict(_SEARCH_DIAGNOSTICS)
 
 
 @register
@@ -26,22 +39,50 @@ class WebSearch(Skill):
         query = params.get("query", "").strip()
         num = max(1, min(int(params.get("num_results", 5)), 10))
         if not query:
+            _mark_search_failure("none", "INVALID_PARAMS", query)
             return skill_err("INVALID_PARAMS", "Missing 'query'.")
 
+        _SEARCH_DIAGNOSTICS["total_requests"] = int(_SEARCH_DIAGNOSTICS.get("total_requests", 0)) + 1
         tavily_key = os.getenv("TAVILY_API_KEY", "")
         serpapi_key = os.getenv("SERPAPI_KEY", "")
         allow_ddg = os.getenv("WEB_SEARCH_ALLOW_DDG", "1") == "1"
+
+        providers: list[tuple[str, Any]] = []
         if tavily_key:
-            return await self._tavily_search(query, num, tavily_key)
+            providers.append(("tavily", lambda: self._tavily_search(query, num, tavily_key)))
         if serpapi_key:
-            return await self._serpapi_search(query, num, serpapi_key)
-        if not allow_ddg:
+            providers.append(("serpapi", lambda: self._serpapi_search(query, num, serpapi_key)))
+        if allow_ddg:
+            providers.append(("duckduckgo", lambda: self._ddg_search(query, num)))
+
+        if not providers:
+            _mark_search_failure("none", "NO_PROVIDER", query)
             return skill_err(
                 "NO_PROVIDER",
                 "No search provider configured. Set TAVILY_API_KEY or SERPAPI_KEY.",
                 provider="none",
             )
-        return await self._ddg_search(query, num)
+
+        failures: list[dict[str, str]] = []
+        for provider, run in providers:
+            result = await run()
+            if result.get("ok", False):
+                _mark_search_success(str(result.get("provider") or provider))
+                if failures:
+                    result["fallbacks"] = failures
+                return result
+            code = str(result.get("code", "SKILL_FAILED"))
+            message = str(result.get("message", "search failed"))
+            failures.append({"provider": provider, "code": code, "message": message})
+            _mark_search_failure(provider, code, query)
+
+        last = failures[-1]
+        return skill_err(
+            last["code"],
+            last["message"],
+            provider=last["provider"],
+            data={"fallbacks": failures, "query": query},
+        )
 
     # ── Tavily (recommended — AI-optimised search) ───────────────
     async def _tavily_search(self, query: str, num: int, key: str) -> dict[str, Any]:
@@ -216,3 +257,18 @@ def _format_results(query: str, results: list[dict], *, provider: str) -> str:
     for i, r in enumerate(results, 1):
         lines.append(f"{i}. {r['title']}\n   {r['snippet']}\n   {r['url']}")
     return "\n".join(lines)
+
+
+def _mark_search_success(provider: str) -> None:
+    _SEARCH_DIAGNOSTICS["last_success_provider"] = provider
+    _SEARCH_DIAGNOSTICS["last_success_ts"] = int(time.time())
+    _SEARCH_DIAGNOSTICS["last_failure"] = None
+
+
+def _mark_search_failure(provider: str, code: str, query: str) -> None:
+    _SEARCH_DIAGNOSTICS["last_failure"] = {
+        "provider": provider,
+        "code": code,
+        "query_preview": query[:120],
+        "ts": int(time.time()),
+    }

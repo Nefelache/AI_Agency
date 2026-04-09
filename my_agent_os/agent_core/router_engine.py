@@ -431,10 +431,36 @@ def _try_direct_skill_route(raw_input: str, tool_names: set[str]) -> tuple[str, 
 
     # Deterministic routing for web search avoids LLM misclassification drift.
     if "web_search" in tool_names:
-        markers = ("上网搜索", "搜索", "search ", "search:")
+        markers = (
+            "上网搜索",
+            "帮我搜索",
+            "请搜索",
+            "查一下",
+            "查一查",
+            "搜一下",
+            "搜一搜",
+            "搜索",
+            "search ",
+            "search:",
+            "look up",
+            "google",
+        )
         if any(m in low for m in markers):
             query = text
-            replacements = ["上网搜索", "帮我搜索", "请搜索", "搜索", "search:", "search "]
+            replacements = [
+                "上网搜索",
+                "帮我搜索",
+                "请搜索",
+                "查一下",
+                "查一查",
+                "搜一下",
+                "搜一搜",
+                "搜索",
+                "search:",
+                "search ",
+                "look up",
+                "google",
+            ]
             for rep in replacements:
                 query = query.replace(rep, " ")
             query = query.strip(" ：:，,。.!?！？")

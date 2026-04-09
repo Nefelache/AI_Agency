@@ -72,6 +72,7 @@ GATEWAY_METHODS: list[str] = [
     "sessions.send",
     "sessions.abort",
     "sessions.patch",
+    "sessions.seal",
     "sessions.reset",
     "sessions.delete",
     "sessions.compact",

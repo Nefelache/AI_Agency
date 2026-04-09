@@ -288,6 +288,7 @@ async def _dispatch_method(method: str, params: dict[str, Any], send: SendFn) ->
 
     if method in (
         "sessions.patch",
+        "sessions.seal",
         "sessions.preview",
         "sessions.create",
         "sessions.delete",
@@ -305,6 +306,12 @@ async def _dispatch_method(method: str, params: dict[str, Any], send: SendFn) ->
                 "path": "agent-os://compat",
                 "key": key,
                 "entry": {"sessionId": key},
+            }, None
+        if method == "sessions.seal":
+            return True, {
+                "ok": True,
+                "key": key,
+                "sealedAt": int(time.time() * 1000),
             }, None
         return True, {"ok": True}, None
 

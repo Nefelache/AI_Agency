@@ -19,6 +19,7 @@ from my_agent_os.auth.dependencies import get_auth_context
 from my_agent_os.auth.models import AuthContext
 from my_agent_os.config.settings import settings
 from my_agent_os.skills_layer.tools import list_tools
+from my_agent_os.skills_layer.tools.web_search import get_web_search_diagnostics
 from my_agent_os.version import __version__ as APP_VERSION
 
 router = APIRouter()
@@ -80,6 +81,7 @@ async def health_skills(auth: AuthContext = Depends(get_auth_context)) -> dict:
         "skill_count": len(tools),
         "skills": tools,
         "providers": providers,
+        "web_search": get_web_search_diagnostics(),
         "auth": {"user_id": auth.user_id, "role": auth.role.value},
     }
 

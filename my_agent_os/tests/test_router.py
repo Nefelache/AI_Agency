@@ -1,7 +1,12 @@
 """Smoke tests for the intent router engine."""
 
 import pytest
-from my_agent_os.agent_core.router_engine import route, _load_prompts, _build_system_message
+from my_agent_os.agent_core.router_engine import (
+    _build_system_message,
+    _load_prompts,
+    _try_direct_skill_route,
+    route,
+)
 
 
 def test_prompts_load_successfully():
@@ -40,3 +45,19 @@ async def test_mobile_route_returns_options():
 async def test_console_route_returns_next_actions():
     result = await route(raw_input="summarize Q3 contracts", channel="console", user_id="test")
     assert "next_actions" in result
+
+
+def test_direct_route_detects_chinese_search_intent():
+    out = _try_direct_skill_route("帮我查一下今天英伟达新闻", {"web_search"})
+    assert out is not None
+    skill, params = out
+    assert skill == "web_search"
+    assert "英伟达新闻" in params["query"]
+
+
+def test_direct_route_detects_english_search_intent():
+    out = _try_direct_skill_route("look up latest deepseek release notes", {"web_search"})
+    assert out is not None
+    skill, params = out
+    assert skill == "web_search"
+    assert "latest deepseek release notes" in params["query"]
