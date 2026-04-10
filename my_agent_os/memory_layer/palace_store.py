@@ -42,6 +42,9 @@ CREATE TABLE IF NOT EXISTS v2_drawers (
     room_id             TEXT NOT NULL,
     user_id             TEXT NOT NULL,
     role                TEXT NOT NULL,
+    kind                TEXT NOT NULL DEFAULT 'raw',
+    classifier_source   TEXT NOT NULL DEFAULT 'rule',
+    wing_confidence     REAL NOT NULL DEFAULT 0.5,
     content             TEXT NOT NULL,
     token_count         INTEGER DEFAULT 0,
     source_session_id   TEXT,
@@ -100,6 +103,7 @@ class PalaceStore:
         await self._db.execute("PRAGMA journal_mode=WAL")
         await self._db.execute("PRAGMA foreign_keys=ON")
         await self._db.executescript(_SCHEMA)
+        await self._ensure_schema_columns()
         await self._db.commit()
 
     async def close(self) -> None:
@@ -115,8 +119,11 @@ class PalaceStore:
         embedding_model: str,
         vectors: list[list[float]],
         source_session_id: str | None = None,
+        wing: str | None = None,
+        classifier_source: str = "rule",
+        wing_confidence: float = 0.5,
     ) -> dict[str, str]:
-        wing = self.classify_wing(user_msg)
+        wing = wing if wing in WINGS else self.classify_wing(user_msg)
         palace = await self._ensure_default_palace(user_id)
         room_name = self._infer_room_name(user_msg or assistant_msg, wing)
         room = await self._ensure_room(palace["id"], wing, room_name)
@@ -127,6 +134,9 @@ class PalaceStore:
             "room_id": room["id"],
             "user_id": user_id,
             "role": "user",
+            "kind": "raw",
+            "classifier_source": classifier_source,
+            "wing_confidence": max(0.0, min(1.0, float(wing_confidence))),
             "content": user_msg,
             "token_count": len(user_msg.split()),
             "source_session_id": source_session_id,
@@ -137,6 +147,9 @@ class PalaceStore:
             "room_id": room["id"],
             "user_id": user_id,
             "role": "assistant",
+            "kind": "raw",
+            "classifier_source": classifier_source,
+            "wing_confidence": max(0.0, min(1.0, float(wing_confidence))),
             "content": assistant_msg,
             "token_count": len(assistant_msg.split()),
             "source_session_id": source_session_id,
@@ -145,13 +158,16 @@ class PalaceStore:
         for drawer in (user_drawer, assistant_drawer):
             await self._db.execute(
                 """INSERT INTO v2_drawers
-                   (id, room_id, user_id, role, content, token_count, source_session_id, created_at)
-                   VALUES (?,?,?,?,?,?,?,?)""",
+                   (id, room_id, user_id, role, kind, classifier_source, wing_confidence, content, token_count, source_session_id, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     drawer["id"],
                     drawer["room_id"],
                     drawer["user_id"],
                     drawer["role"],
+                    drawer["kind"],
+                    drawer["classifier_source"],
+                    drawer["wing_confidence"],
                     drawer["content"],
                     drawer["token_count"],
                     drawer["source_session_id"],
@@ -167,12 +183,58 @@ class PalaceStore:
         await self._db.commit()
         return {"wing": wing, "room_id": room["id"]}
 
+    async def ingest_distilled(
+        self,
+        user_id: str,
+        wing: str,
+        content: str,
+        embedding_model: str,
+        vector: list[float],
+        source_session_id: str | None = None,
+        room_hint: str | None = None,
+    ) -> dict[str, str]:
+        wing_name = wing if wing in WINGS else "execution"
+        palace = await self._ensure_default_palace(user_id)
+        room_name = room_hint or f"{wing_name}-distilled"
+        room = await self._ensure_room(palace["id"], wing_name, room_name[:48])
+        now = _now_iso()
+        drawer_id = _short_id()
+        await self._db.execute(
+            """INSERT INTO v2_drawers
+               (id, room_id, user_id, role, kind, classifier_source, wing_confidence, content, token_count, source_session_id, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                drawer_id,
+                room["id"],
+                user_id,
+                "system",
+                "distilled",
+                "llm",
+                0.95,
+                content,
+                len(content.split()),
+                source_session_id,
+                now,
+            ),
+        )
+        await self._upsert_embedding(drawer_id, embedding_model, vector, now)
+        await self._db.execute(
+            "UPDATE v2_rooms SET updated_at = ?, last_active_at = ? WHERE id = ?",
+            (now, now, room["id"]),
+        )
+        await self._db.commit()
+        return {"wing": wing_name, "room_id": room["id"], "drawer_id": drawer_id}
+
     async def palace_overview(self, user_id: str) -> dict[str, Any]:
         palace = await self._ensure_default_palace(user_id)
-        wings = {w: {"rooms": 0, "drawers": 0, "recent": []} for w in WINGS}
+        wings = {w: {"rooms": 0, "drawers": 0, "distilled": 0, "recent": []} for w in WINGS}
         async with self._db.execute(
             """
-            SELECT r.wing, COUNT(DISTINCT r.id) as room_count, COUNT(d.id) as drawer_count
+            SELECT
+              r.wing,
+              COUNT(DISTINCT r.id) as room_count,
+              COUNT(d.id) as drawer_count,
+              SUM(CASE WHEN d.kind = 'distilled' THEN 1 ELSE 0 END) as distilled_count
             FROM v2_rooms r
             LEFT JOIN v2_drawers d ON d.room_id = r.id
             WHERE r.palace_id = ?
@@ -186,10 +248,11 @@ class PalaceStore:
             if wing in wings:
                 wings[wing]["rooms"] = row["room_count"]
                 wings[wing]["drawers"] = row["drawer_count"]
+                wings[wing]["distilled"] = row["distilled_count"] or 0
 
         async with self._db.execute(
             """
-            SELECT r.wing, d.role, d.content, d.created_at
+            SELECT r.wing, d.role, d.kind, d.content, d.created_at
             FROM v2_drawers d
             JOIN v2_rooms r ON r.id = d.room_id
             JOIN v2_palaces p ON p.id = r.palace_id
@@ -209,6 +272,7 @@ class PalaceStore:
             wings[wing]["recent"].append(
                 {
                     "role": row["role"],
+                    "kind": row["kind"],
                     "content": (row["content"] or "")[:180],
                     "created_at": row["created_at"],
                 }
@@ -230,7 +294,7 @@ class PalaceStore:
             params.append(wing)
         async with self._db.execute(
             f"""
-            SELECT d.id, d.role, d.content, d.created_at, r.wing, r.name as room_name, e.vector_json
+            SELECT d.id, d.role, d.kind, d.classifier_source, d.wing_confidence, d.content, d.created_at, r.wing, r.name as room_name, e.vector_json
             FROM v2_drawers d
             JOIN v2_embeddings e ON e.drawer_id = d.id
             JOIN v2_rooms r ON r.id = d.room_id
@@ -253,10 +317,15 @@ class PalaceStore:
             vec_score = cosine_similarity(query_vector, vec)
             lex_score = lexical_scores.get(row["id"], 0.0)
             score = 0.72 * vec_score + 0.28 * lex_score
+            if row["kind"] == "distilled":
+                score += 0.08
             scored.append(
                 {
                     "id": row["id"],
                     "role": row["role"],
+                    "kind": row["kind"],
+                    "classifier_source": row["classifier_source"],
+                    "wing_confidence": float(row["wing_confidence"] or 0.5),
                     "content": row["content"],
                     "created_at": row["created_at"],
                     "wing": row["wing"],
@@ -304,7 +373,7 @@ class PalaceStore:
     async def list_recent_drawers(self, user_id: str, limit: int = 100) -> list[dict[str, Any]]:
         async with self._db.execute(
             """
-            SELECT d.id, d.role, d.content, d.created_at, r.wing, r.name as room_name
+            SELECT d.id, d.role, d.kind, d.classifier_source, d.wing_confidence, d.content, d.created_at, r.wing, r.name as room_name
             FROM v2_drawers d
             JOIN v2_rooms r ON r.id = d.room_id
             JOIN v2_palaces p ON p.id = r.palace_id
@@ -319,6 +388,38 @@ class PalaceStore:
             {
                 "id": r["id"],
                 "role": r["role"],
+                "kind": r["kind"],
+                "classifier_source": r["classifier_source"],
+                "wing_confidence": float(r["wing_confidence"] or 0.5),
+                "content": r["content"],
+                "created_at": r["created_at"],
+                "wing": r["wing"],
+                "room": r["room_name"],
+            }
+            for r in rows
+        ]
+
+    async def list_drawers_since(self, user_id: str, since_iso: str, limit: int = 300) -> list[dict[str, Any]]:
+        async with self._db.execute(
+            """
+            SELECT d.id, d.role, d.kind, d.classifier_source, d.wing_confidence, d.content, d.created_at, r.wing, r.name as room_name
+            FROM v2_drawers d
+            JOIN v2_rooms r ON r.id = d.room_id
+            JOIN v2_palaces p ON p.id = r.palace_id
+            WHERE p.user_id = ? AND d.created_at >= ?
+            ORDER BY d.created_at DESC
+            LIMIT ?
+            """,
+            (user_id, since_iso, limit),
+        ) as cur:
+            rows = await cur.fetchall()
+        return [
+            {
+                "id": r["id"],
+                "role": r["role"],
+                "kind": r["kind"],
+                "classifier_source": r["classifier_source"],
+                "wing_confidence": float(r["wing_confidence"] or 0.5),
                 "content": r["content"],
                 "created_at": r["created_at"],
                 "wing": r["wing"],
@@ -332,7 +433,7 @@ class PalaceStore:
         await self._db.commit()
 
     @staticmethod
-    def classify_wing(text: str) -> str:
+    def classify_wing_rule(text: str) -> tuple[str, float] | None:
         low = (text or "").lower()
         rules = {
             "strategy": ("strategy", "plan", "roadmap", "方向", "战略", "规划"),
@@ -342,8 +443,17 @@ class PalaceStore:
             "execution": ("todo", "task", "next", "execute", "执行", "任务", "推进"),
         }
         for wing, keywords in rules.items():
-            if any(k in low for k in keywords):
-                return wing
+            hits = sum(1 for k in keywords if k in low)
+            if hits > 0:
+                confidence = min(0.92, 0.55 + 0.12 * hits)
+                return wing, confidence
+        return None
+
+    @staticmethod
+    def classify_wing(text: str) -> str:
+        matched = PalaceStore.classify_wing_rule(text)
+        if matched:
+            return matched[0]
         return "execution"
 
     async def _upsert_embedding(
@@ -359,6 +469,19 @@ class PalaceStore:
                VALUES (?,?,?,?,?)""",
             (drawer_id, model, len(vector), json.dumps(vector), created_at),
         )
+
+    async def _ensure_schema_columns(self) -> None:
+        await self._ensure_column("v2_drawers", "kind", "TEXT NOT NULL DEFAULT 'raw'")
+        await self._ensure_column("v2_drawers", "classifier_source", "TEXT NOT NULL DEFAULT 'rule'")
+        await self._ensure_column("v2_drawers", "wing_confidence", "REAL NOT NULL DEFAULT 0.5")
+
+    async def _ensure_column(self, table: str, column: str, ddl: str) -> None:
+        async with self._db.execute(f"PRAGMA table_info({table})") as cur:
+            cols = await cur.fetchall()
+        names = {str(c["name"]) for c in cols}
+        if column in names:
+            return
+        await self._db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
     async def _ensure_default_palace(self, user_id: str) -> dict[str, Any]:
         now = _now_iso()

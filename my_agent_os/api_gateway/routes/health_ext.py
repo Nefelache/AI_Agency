@@ -51,6 +51,12 @@ async def health_extended(auth: AuthContext = Depends(get_auth_context)) -> dict
         "status": "ok" if (db_ok and llm_ok and (bridge_ok is not False)) else "degraded",
         "db": {"ok": db_ok, "path": str(db_path)},
         "llm": {"ok": llm_ok, "provider": "deepseek", "model": settings.DEEPSEEK_MODEL},
+        "memory_v2": {
+            "enabled": bool(settings.MEMORY_V2_ENABLED),
+            "db_path": settings.MEMORY_V2_DB_PATH,
+            "maintenance_interval_s": int(getattr(settings, "MEMORY_V2_MAINTENANCE_INTERVAL_SECONDS", 1200) or 1200),
+            "distill_window_min": int(getattr(settings, "MEMORY_V2_DISTILL_WINDOW_MINUTES", 20) or 20),
+        },
         "whatsapp_bridge": {"ok": bridge_ok, "last_seen_age_s": bridge_age_s},
         "auth": {"user_id": auth.user_id, "role": auth.role.value},
     }

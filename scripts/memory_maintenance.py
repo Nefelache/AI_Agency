@@ -39,8 +39,8 @@ async def _run(user_id: str, lookback_days: int, max_items: int) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(description="Consolidate episodic memories and prune fragments")
     p.add_argument("--user-id", default="default")
-    p.add_argument("--lookback-days", type=int, default=7)
-    p.add_argument("--max-items", type=int, default=30)
+    p.add_argument("--lookback-days", type=int, default=settings.MEMORY_V2_MAINTENANCE_LOOKBACK_DAYS)
+    p.add_argument("--max-items", type=int, default=settings.MEMORY_V2_MAX_RAW_PER_ROOM)
     args = p.parse_args()
     asyncio.run(_run(args.user_id, args.lookback_days, args.max_items))
 

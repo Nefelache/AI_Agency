@@ -71,6 +71,26 @@ async def get_stats(auth: AuthContext = Depends(get_auth_context)) -> dict[str, 
     return await engine.stats(auth.user_id)
 
 
+@router.get("/maintenance/status")
+async def maintenance_status(auth: AuthContext = Depends(get_auth_context)) -> dict[str, Any]:
+    engine = _get_engine()
+    return engine.maintenance_status(auth.user_id)
+
+
+@router.post("/maintenance/run")
+async def maintenance_run(
+    lookback_days: int = 7,
+    max_items: int = 40,
+    auth: AuthContext = Depends(require_role(Role.OWNER)),
+) -> dict[str, Any]:
+    engine = _get_engine()
+    return await engine.run_maintenance(
+        user_id=auth.user_id,
+        lookback_days=max(1, lookback_days),
+        max_items=max(10, max_items),
+    )
+
+
 @router.get("/list")
 async def list_memories(
     limit: int = 50,

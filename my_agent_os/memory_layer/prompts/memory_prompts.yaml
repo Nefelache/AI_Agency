@@ -80,6 +80,33 @@ summarization: |
     "topic": "..."
   }
 
+wing_classification: |
+  You are a memory wing classifier.
+  Select exactly one wing for this conversation:
+  - strategy: goals, direction, planning, roadmap
+  - execution: tasks, progress, actioning, delivery
+  - product: feature requests, UX/UI, user requirements
+  - ops: deploy, infra, incidents, monitoring, reliability
+  - people: user profile, team dynamics, stakeholder information
+
+  Return JSON only:
+  {"wing":"strategy|execution|product|ops|people","confidence":0.0}
+
+distillation: |
+  Distill the conversation into compact long-term memory.
+  Keep only durable, high-signal information.
+  Return JSON only:
+  {
+    "summary": "one short paragraph",
+    "facts": ["fact 1", "fact 2"],
+    "decisions": ["decision 1"],
+    "tasks": ["task 1"],
+    "risks": ["risk 1"]
+  }
+
+  Conversation:
+  {conversation}
+
 entity_extraction: |
   Extract the key entities and topics from this query for memory lookup.
   Return only the most specific, meaningful terms (not stop words).
