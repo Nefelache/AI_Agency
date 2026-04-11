@@ -13,6 +13,7 @@ def test_prompts_load_successfully():
     prompts = _load_prompts()
     assert "core_identity" in prompts
     assert "control_aesthetic" in prompts
+    assert "memory_grounding" in prompts
     assert "decision_engine" in prompts
     assert "preferences" in prompts
 

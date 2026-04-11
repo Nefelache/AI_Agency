@@ -56,8 +56,10 @@ def _build_system_message(prompts: dict, channel: str) -> str:
     parts = [
         prompts["core_identity"],
         prompts["control_aesthetic"],
-        prompts["decision_engine"],
     ]
+    if prompts.get("memory_grounding"):
+        parts.append(prompts["memory_grounding"])
+    parts.append(prompts["decision_engine"])
     channel_key = f"channel_{channel}"
     if channel_key in prompts:
         parts.append(prompts[channel_key])
@@ -96,7 +98,8 @@ async def route(
             logger.warning("Memory retrieval failed (non-fatal): %s", e)
 
     user_payload_parts.append(
-        f"\n[User Preferences]\n{json.dumps(preferences, ensure_ascii=False)}"
+        "\n[Soft defaults — lifestyle/aesthetic only; do not substitute for missing business facts]\n"
+        + json.dumps(preferences, ensure_ascii=False)
     )
 
     # Complexity routing: crew (console only) or single agent

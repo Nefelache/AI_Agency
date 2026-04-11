@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     MEMORY_V2_MAINTENANCE_LOOKBACK_DAYS: int = 7
     MEMORY_V2_DISTILL_WINDOW_MINUTES: int = 20
     MEMORY_V2_MAX_RAW_PER_ROOM: int = 40
+    # When set, retrieve() also pulls top matches from this user_id (e.g. preset "default" boss library).
+    MEMORY_V2_BASELINE_USER_ID: str = "default"
 
     # --- Enterprise: Audit ---
     AUDIT_ENABLED: bool = True

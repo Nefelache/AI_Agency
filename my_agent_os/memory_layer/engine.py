@@ -60,20 +60,49 @@ class MemoryEngine:
             return InjectionContext()
         qvec = await self._embed.embed_text(query)
         hits = await self._palace.vector_search(user_id, qvec, query_text=query, top_k=self._top_k)
-        if not hits:
+
+        baseline_id = (getattr(settings, "MEMORY_V2_BASELINE_USER_ID", "") or "").strip()
+        baseline_hits: list[dict[str, Any]] = []
+        if baseline_id and baseline_id != user_id:
+            k = min(5, max(2, self._top_k))
+            baseline_hits = await self._palace.vector_search(
+                baseline_id, qvec, query_text=query, top_k=k
+            )
+
+        merged: list[tuple[bool, dict[str, Any]]] = []
+        seen: set[str] = set()
+        for h in hits:
+            hid = str(h.get("id", ""))
+            if hid and hid not in seen:
+                seen.add(hid)
+                merged.append((False, h))
+        for h in baseline_hits:
+            hid = str(h.get("id", ""))
+            if hid and hid not in seen:
+                seen.add(hid)
+                merged.append((True, h))
+
+        if not merged:
             return InjectionContext()
+
+        max_total = max(self._top_k + 4, 8)
+        merged = merged[:max_total]
+
         summary_parts: list[str] = []
         detail_parts: list[str] = []
         char_budget = max(800, self._max_chars)
         used = 0
-        for h in hits:
+        source_ids: list[str] = []
+        for is_baseline, h in merged:
             snippet = (h["content"] or "").strip().replace("\n", " ")
             if not snippet:
                 continue
             kind = h.get("kind", "raw")
             marker = "distilled" if kind == "distilled" else "raw"
-            line = f"- [{h['wing']}/{h['room']}/{marker}] {snippet[:180]}"
+            prefix = "[共享标准库] " if is_baseline else ""
+            line = f"- {prefix}[{h['wing']}/{h['room']}/{marker}] {snippet[:180]}"
             summary_parts.append(line)
+            source_ids.append(str(h.get("id", "")))
             if used < char_budget:
                 detail = f"  ({h['role']}, {kind}, score={h['score']}) {snippet[:320]}"
                 detail_parts.append(detail)
@@ -82,7 +111,7 @@ class MemoryEngine:
             summary_layer="\n".join(summary_parts),
             decision_layer="",
             detail_layer="\n".join(detail_parts),
-            source_ids=[h["id"] for h in hits],
+            source_ids=source_ids,
             token_estimate=used // 4,
         )
 
