@@ -2,7 +2,7 @@
 Skill Writer — enables the agent to author and register new skills at runtime.
 
 Foundation for the self-extending agent (v1.5 will wire this into router_engine).
-Security: only callable with OWNER role. Generated code is scanned before write.
+Security: only callable with ROOT role. Generated code is scanned before write.
 
 Pipeline (Voyager-style):
   1. PROPOSE  — LLM designs the skill given a task description

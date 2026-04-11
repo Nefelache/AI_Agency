@@ -152,7 +152,7 @@ def main() -> None:
             if k in generated:
                 print(f"  {k}={generated[k]}")
         print("")
-        print("  Web 控制台：把 API_KEY_OWNER 粘贴到页面顶部「API KEY」输入框。")
+        print("  Web 控制台：将 API_KEY_OWNER 粘贴到侧栏「Gateway key」输入框。")
         print("  保存位置：", ENV_PATH)
         print("=" * 60)
         print("")

@@ -4,14 +4,14 @@ User Store — SQLite-backed multi-user registry.
 Separate from the memory DB so that users.db can be backed up independently.
 Passwords are hashed with PBKDF2-HMAC-SHA256 (100k iterations).
 
-Table: users(id, email, password_hash, plan, role, created_at, stripe_customer_id)
+Table: users(id, email, password_hash, plan, role, created_at, stripe_customer_id).
+Roles: root (admin), employee (staff). Legacy DB rows may still have role 'owner' — migrated to root.
 """
 
 from __future__ import annotations
 
 import asyncio
 import hashlib
-import os
 import secrets
 import sqlite3
 import uuid
@@ -19,8 +19,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-_DB_PATH = Path(os.getenv("USERS_DB_PATH", "my_agent_os/memory_layer/data/users.db"))
-_ITERS   = 100_000
+from my_agent_os.config.settings import settings
+
+_ITERS = 100_000
 _HASH_ALG = "sha256"
 
 
@@ -45,8 +46,8 @@ def _verify_password(password: str, stored: str) -> bool:
 class UserStore:
     """Sync SQLite wrapper (run in executor for async contexts)."""
 
-    def __init__(self, db_path: str | Path = _DB_PATH):
-        self._path = Path(db_path)
+    def __init__(self, db_path: str | Path | None = None):
+        self._path = Path(db_path if db_path is not None else settings.USERS_DB_PATH)
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
@@ -63,7 +64,7 @@ class UserStore:
                     email              TEXT UNIQUE NOT NULL,
                     password_hash      TEXT NOT NULL,
                     plan               TEXT DEFAULT 'free',
-                    role               TEXT DEFAULT 'owner',
+                    role               TEXT DEFAULT 'employee',
                     created_at         TEXT NOT NULL,
                     stripe_customer_id TEXT DEFAULT '',
                     stripe_sub_id      TEXT DEFAULT '',
@@ -71,26 +72,57 @@ class UserStore:
                 );
                 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
             """)
+            self._migrate_roles(conn)
+
+    def _migrate_roles(self, conn: sqlite3.Connection) -> None:
+        conn.execute("UPDATE users SET role='root' WHERE role IN ('owner','') OR role IS NULL")
 
     # ── CRUD ─────────────────────────────────────────────────────
 
-    def create_user(self, email: str, password: str, plan: str = "free") -> dict[str, Any]:
+    def create_user(
+        self, email: str, password: str, plan: str = "free", role: str = "employee"
+    ) -> dict[str, Any]:
         email = email.strip().lower()
         if not email or "@" not in email:
             raise ValueError("Invalid email address.")
         if len(password) < 8:
             raise ValueError("Password must be at least 8 characters.")
-        uid  = str(uuid.uuid4())
+        role = (role or "employee").strip().lower()
+        if role not in ("employee", "root"):
+            raise ValueError("Invalid role.")
+        uid = str(uuid.uuid4())
         phash = _hash_password(password)
         with self._conn() as conn:
             try:
                 conn.execute(
-                    "INSERT INTO users (id, email, password_hash, plan, created_at) VALUES (?,?,?,?,?)",
-                    (uid, email, phash, plan, _now_iso()),
+                    """INSERT INTO users (id, email, password_hash, plan, role, created_at)
+                       VALUES (?,?,?,?,?,?)""",
+                    (uid, email, phash, plan, role, _now_iso()),
                 )
             except sqlite3.IntegrityError:
                 raise ValueError(f"Email already registered: {email}")
         return self.get_user_by_id(uid)
+
+    def ensure_bootstrap_root(self, email: str, password: str) -> None:
+        """Create or reset root account from env (idempotent)."""
+        email = email.strip().lower()
+        if not email or "@" not in email or len(password) < 8:
+            return
+        phash = _hash_password(password)
+        with self._conn() as conn:
+            row = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+            if row:
+                conn.execute(
+                    "UPDATE users SET password_hash = ?, role = 'root' WHERE email = ?",
+                    (phash, email),
+                )
+            else:
+                uid = str(uuid.uuid4())
+                conn.execute(
+                    """INSERT INTO users (id, email, password_hash, plan, role, created_at)
+                       VALUES (?,?,?,?,?,?)""",
+                    (uid, email, phash, "free", "root", _now_iso()),
+                )
 
     def authenticate(self, email: str, password: str) -> dict[str, Any] | None:
         email = email.strip().lower()

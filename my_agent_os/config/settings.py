@@ -74,9 +74,13 @@ class Settings(BaseSettings):
     MQTT_BROKER: str = "localhost"
     MQTT_PORT: int = 1883
 
-    # --- Multi-user JWT ---
-    JWT_SECRET: str = ""           # Set a strong random secret in production
+    # --- Multi-user JWT & dashboard login ---
+    JWT_SECRET: str = ""  # Set a strong random secret in production
     USERS_DB_PATH: str = "my_agent_os/memory_layer/data/users.db"
+    # If set, ensures this email exists with role root (password reset on each startup if unchanged pattern not desired — change in user_store if needed)
+    AUTH_BOOTSTRAP_ROOT_EMAIL: str = ""
+    AUTH_BOOTSTRAP_ROOT_PASSWORD: str = ""
+    AUTH_ALLOW_PUBLIC_REGISTER: bool = True  # False = only root-created accounts (use bootstrap + DB)
 
     # --- Stripe Billing ---
     STRIPE_SECRET_KEY: str = ""

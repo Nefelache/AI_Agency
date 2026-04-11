@@ -58,6 +58,14 @@ async def lifespan(app: FastAPI):
     from my_agent_os.agent_core.router_engine import route as _route_fn
     slack.set_router(_route_fn)
 
+    from my_agent_os.auth.user_store import get_user_store
+
+    if settings.AUTH_BOOTSTRAP_ROOT_EMAIL.strip() and settings.AUTH_BOOTSTRAP_ROOT_PASSWORD:
+        get_user_store().ensure_bootstrap_root(
+            settings.AUTH_BOOTSTRAP_ROOT_EMAIL.strip(),
+            settings.AUTH_BOOTSTRAP_ROOT_PASSWORD,
+        )
+
     # Enterprise: prune old audit logs on startup (best-effort)
     try:
         prune_retention()

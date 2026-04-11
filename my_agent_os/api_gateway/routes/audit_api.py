@@ -14,8 +14,8 @@ from typing import Any, Iterable
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from my_agent_os.auth.dependencies import require_role
-from my_agent_os.auth.models import AuthContext, Role
+from my_agent_os.auth.dependencies import require_admin
+from my_agent_os.auth.models import AuthContext
 from my_agent_os.enterprise.audit import audit_dir
 
 router = APIRouter(prefix="/audit", tags=["Audit"])
@@ -45,7 +45,7 @@ def _iter_jsonl(path: Path) -> Iterable[dict[str, Any]]:
 
 
 @router.get("/dates")
-async def list_dates(auth: AuthContext = Depends(require_role(Role.OWNER))) -> dict[str, Any]:
+async def list_dates(auth: AuthContext = Depends(require_admin())) -> dict[str, Any]:
     d = audit_dir()
     dates = []
     for p in sorted(d.glob("audit_*.jsonl"), reverse=True):
@@ -66,7 +66,7 @@ class AuditSearchRequest(BaseModel):
 @router.post("/search")
 async def search_audit(
     req: AuditSearchRequest,
-    auth: AuthContext = Depends(require_role(Role.OWNER)),
+    auth: AuthContext = Depends(require_admin()),
 ) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     for path in _iter_files(req.date):

@@ -1,8 +1,8 @@
 """
 Memory API — REST endpoints for memory inspection and management.
 
-Auth: read endpoints require OWNER or CHANNEL role.
-      write/delete endpoints require OWNER role only.
+Auth: read endpoints — ROOT, EMPLOYEE, or CHANNEL.
+      write/delete/seal/maintenance — ROOT only (or legacy owner API key).
 """
 
 from __future__ import annotations
@@ -12,8 +12,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from my_agent_os.auth.dependencies import get_auth_context, require_role, rate_limit_check
-from my_agent_os.auth.models import AuthContext, Role
+from my_agent_os.auth.dependencies import get_auth_context, require_admin, rate_limit_check
+from my_agent_os.auth.models import AuthContext
 
 router = APIRouter(dependencies=[Depends(rate_limit_check)])
 
@@ -81,7 +81,7 @@ async def maintenance_status(auth: AuthContext = Depends(get_auth_context)) -> d
 async def maintenance_run(
     lookback_days: int = 7,
     max_items: int = 40,
-    auth: AuthContext = Depends(require_role(Role.OWNER)),
+    auth: AuthContext = Depends(require_admin()),
 ) -> dict[str, Any]:
     engine = _get_engine()
     return await engine.run_maintenance(
@@ -166,7 +166,7 @@ async def palace_search(
 
 @router.post("/seal")
 async def seal_session(
-    auth: AuthContext = Depends(require_role(Role.OWNER)),
+    auth: AuthContext = Depends(require_admin()),
 ) -> dict[str, Any]:
     engine = _get_engine()
     return await engine.force_seal_session(auth.user_id)
@@ -175,7 +175,7 @@ async def seal_session(
 @router.delete("/{memory_id}")
 async def delete_memory(
     memory_id: str,
-    auth: AuthContext = Depends(require_role(Role.OWNER)),
+    auth: AuthContext = Depends(require_admin()),
 ) -> dict[str, str]:
     engine = _get_engine()
     await engine.delete_memory(memory_id)
