@@ -135,7 +135,17 @@ if _OPENCLAW_STATIC.is_dir():
 
 @app.get("/")
 async def index():
+    return FileResponse(_STATIC_DIR / "dashboard.html")
+
+
+@app.get("/console")
+async def console_ui():
     return FileResponse(_STATIC_DIR / "index.html")
+
+
+@app.get("/dashboard")
+async def dashboard():
+    return FileResponse(_STATIC_DIR / "dashboard.html")
 
 
 @app.get("/setup")

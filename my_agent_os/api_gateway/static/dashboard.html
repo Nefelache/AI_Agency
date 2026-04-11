@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent OS — Dashboard</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  /* Deep navy + indigo — intentionally different from the console's black/red */
+  --bg:#0f172a;
+  --panel:#1e293b;
+  --surface:#253347;
+  --surface-hi:#334155;
+  --border:#334155;
+  --border-dim:#253347;
+  --text:#f1f5f9;
+  --text-dim:#94a3b8;
+  --text-muted:#64748b;
+  --accent:#818cf8;
+  --accent-dark:#6366f1;
+  --accent-glow:rgba(129,140,248,.18);
+  --ok:#4ade80;
+  --warn:#fb923c;
+  --err:#f87171;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif;
+  --mono:'SF Mono','Cascadia Code','Consolas',monospace;
+  --radius:8px;--radius-sm:5px;
+  --trans:.15s ease;
+  --topbar-h:56px;
+  --sidebar-w:220px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6;overflow:hidden}
+
+/* ── App shell ────────────────────────────────────── */
+#app{display:flex;flex-direction:column;height:100vh}
+
+/* ── Topbar ───────────────────────────────────────── */
+#topbar{
+  height:var(--topbar-h);flex-shrink:0;
+  display:flex;align-items:center;gap:12px;
+  padding:0 20px;
+  background:#0a0f1c;
+  border-bottom:1px solid var(--border-dim);
+  z-index:100;
+}
+.tb-logo{
+  display:flex;align-items:center;gap:8px;
+  font-size:15px;font-weight:600;color:var(--text);letter-spacing:-.01em;
+  user-select:none;
+}
+.tb-logo-mark{
+  width:26px;height:26px;border-radius:6px;
+  background:var(--accent);display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:#fff;
+}
+.tb-version{
+  font-size:10px;font-family:var(--mono);color:var(--text-muted);
+  background:var(--border-dim);padding:1px 7px;border-radius:20px;
+  border:1px solid var(--border);
+}
+.tb-spacer{flex:1}
+.tb-breadcrumb{
+  font-size:12px;color:var(--text-muted);
+  display:flex;align-items:center;gap:6px;
+  font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em;
+}
+.tb-breadcrumb span{color:var(--text-dim)}
+.tb-key-wrap{display:flex;align-items:center;gap:8px}
+.tb-key-label{font-size:10px;color:var(--text-muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+#tb-key{
+  width:200px;padding:6px 10px;
+  border:1px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--panel);color:var(--text);
+  font-family:var(--mono);font-size:11px;outline:none;
+  transition:border-color var(--trans);
+}
+#tb-key:focus{border-color:var(--accent)}
+#auth-dot{width:8px;height:8px;border-radius:50%;background:var(--text-muted);transition:background var(--trans)}
+#auth-dot.ok{background:var(--ok)}
+#auth-dot.err{background:var(--err)}
+.tb-link{
+  padding:5px 12px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);background:transparent;
+  color:var(--text-dim);font-size:12px;cursor:pointer;text-decoration:none;
+  font-family:var(--font);transition:all var(--trans);white-space:nowrap;
+}
+.tb-link:hover{background:var(--surface);color:var(--text)}
+
+/* ── Body (sidebar + main) ────────────────────────── */
+#body{display:flex;flex:1;overflow:hidden}
+
+/* ── Sidebar ──────────────────────────────────────── */
+#sidebar{
+  width:var(--sidebar-w);flex-shrink:0;
+  display:flex;flex-direction:column;
+  background:#0a0f1c;border-right:1px solid var(--border-dim);
+  overflow:hidden;transition:width var(--trans);
+}
+#sidebar.collapsed{width:0}
+.nav-section{padding:16px 10px 6px;font-size:10px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;font-family:var(--mono)}
+.nav-list{list-style:none;padding:4px 8px;flex:1;display:flex;flex-direction:column;gap:2px}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;
+  color:var(--text-muted);font-size:13px;font-weight:500;
+  transition:all var(--trans);white-space:nowrap;
+  user-select:none;
+}
+.nav-item:hover{background:var(--surface-hi);color:var(--text)}
+.nav-item.active{background:var(--accent-glow);color:var(--accent)}
+.nav-item svg{flex-shrink:0;opacity:.7}
+.nav-item.active svg{opacity:1}
+.nav-divider{height:1px;background:var(--border-dim);margin:8px 10px}
+.nav-badge{
+  margin-left:auto;font-size:10px;font-family:var(--mono);
+  padding:1px 6px;border-radius:20px;
+  background:var(--accent-glow);color:var(--accent);
+}
+
+/* ── Main content ─────────────────────────────────── */
+#main{flex:1;overflow-y:auto;background:var(--bg)}
+#main::-webkit-scrollbar{width:4px}
+#main::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+.section{display:none;padding:28px 32px;min-height:100%}
+.section.active{display:block}
+/* Chat section has special layout */
+#sec-chat.active{display:flex;flex-direction:column;padding:0;height:100%}
+
+/* ── Section header ───────────────────────────────── */
+.sec-header{margin-bottom:24px}
+.sec-title{font-size:20px;font-weight:600;color:var(--text);letter-spacing:-.02em}
+.sec-sub{font-size:13px;color:var(--text-muted);margin-top:4px}
+
+/* ── Stat cards ───────────────────────────────────── */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 18px;
+}
+.stat-card .sc-label{font-size:10px;font-family:var(--mono);color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.stat-card .sc-value{font-size:28px;font-weight:700;color:var(--text);line-height:1;margin-bottom:4px}
+.stat-card .sc-sub{font-size:11px;color:var(--text-muted)}
+.stat-card .sc-value.ok{color:var(--ok)}
+.stat-card .sc-value.warn{color:var(--warn)}
+.stat-card .sc-value.err{color:var(--err)}
+.stat-card .sc-value.accent{color:var(--accent)}
+
+/* ── Cards / panels ───────────────────────────────── */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px}
+.card-header{
+  padding:14px 18px 10px;border-bottom:1px solid var(--border-dim);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.card-title{font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono)}
+.card-body{padding:16px 18px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.two-col{grid-template-columns:1fr}}
+
+/* ── Tables ───────────────────────────────────────── */
+.data-table{width:100%;border-collapse:collapse;font-size:12px}
+.data-table th{
+  text-align:left;padding:8px 12px;
+  font-size:10px;font-family:var(--mono);color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:.06em;
+  border-bottom:1px solid var(--border);
+}
+.data-table td{
+  padding:10px 12px;border-bottom:1px solid var(--border-dim);
+  color:var(--text-dim);vertical-align:middle;
+}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:rgba(255,255,255,.02)}
+.data-table td .primary{color:var(--text);font-weight:500}
+.data-table td code{font-family:var(--mono);font-size:11px;background:var(--surface);padding:1px 5px;border-radius:3px}
+
+/* ── Status badges ────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-family:var(--mono);padding:2px 8px;border-radius:20px;white-space:nowrap}
+.badge.ok{background:rgba(74,222,128,.12);color:var(--ok);border:1px solid rgba(74,222,128,.25)}
+.badge.warn{background:rgba(251,146,60,.12);color:var(--warn);border:1px solid rgba(251,146,60,.25)}
+.badge.err{background:rgba(248,113,113,.12);color:var(--err);border:1px solid rgba(248,113,113,.25)}
+.badge.accent{background:var(--accent-glow);color:var(--accent);border:1px solid rgba(129,140,248,.3)}
+.badge.muted{background:var(--surface);color:var(--text-muted);border:1px solid var(--border)}
+.badge-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.badge.ok .badge-dot{background:var(--ok)}
+.badge.warn .badge-dot{background:var(--warn)}
+.badge.err .badge-dot{background:var(--err)}
+.badge.muted .badge-dot{background:var(--text-muted)}
+
+/* ── Channel cards ────────────────────────────────── */
+.channel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.ch-card{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px;display:flex;flex-direction:column;gap:12px;
+  transition:border-color var(--trans);
+}
+.ch-card:hover{border-color:var(--surface-hi)}
+.ch-card-top{display:flex;align-items:center;gap:12px}
+.ch-icon{
+  width:36px;height:36px;border-radius:8px;background:var(--surface);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.ch-name{font-size:14px;font-weight:600;color:var(--text)}
+.ch-desc{font-size:12px;color:var(--text-muted);line-height:1.5}
+.ch-footer{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
+.btn{
+  padding:6px 14px;border-radius:var(--radius-sm);font-size:12px;font-family:var(--font);
+  cursor:pointer;border:1px solid var(--border);background:var(--surface);
+  color:var(--text-dim);transition:all var(--trans);white-space:nowrap;
+}
+.btn:hover{background:var(--surface-hi);color:var(--text)}
+.btn.primary{background:var(--accent);border-color:transparent;color:#fff}
+.btn.primary:hover{background:var(--accent-dark)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── Skill chips ──────────────────────────────────── */
+.skill-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.skill-chip{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:12px 14px;transition:border-color var(--trans);
+}
+.skill-chip:hover{border-color:var(--accent);background:var(--surface)}
+.skill-chip .sk-name{font-size:12px;font-weight:600;color:var(--accent);font-family:var(--mono);margin-bottom:4px}
+.skill-chip .sk-desc{font-size:11px;color:var(--text-muted);line-height:1.45}
+
+/* ── Health table ─────────────────────────────────── */
+.health-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border-dim)}
+.health-row:last-child{border-bottom:none}
+.health-row .hr-key{font-size:12px;color:var(--text-dim);font-family:var(--mono)}
+.health-row .hr-val{font-size:12px;color:var(--text)}
+
+/* ── Loading / empty states ───────────────────────── */
+.loading{display:flex;align-items:center;gap:8px;padding:24px;color:var(--text-muted);font-size:12px}
+.loading-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:ldot 1s infinite both}
+.loading-dot:nth-child(2){animation-delay:.2s}
+.loading-dot:nth-child(3){animation-delay:.4s}
+@keyframes ldot{0%,80%,100%{opacity:.2;transform:scale(1)}40%{opacity:1;transform:scale(1.3)}}
+.empty-state{padding:40px;text-align:center;color:var(--text-muted);font-size:13px}
+.empty-state svg{opacity:.3;margin-bottom:12px}
+
+/* ── Chat section ─────────────────────────────────── */
+#sec-chat{overflow:hidden}
+#chat-wrap{display:flex;flex:1;overflow:hidden;height:100%}
+#chat-sessions{
+  width:230px;flex-shrink:0;
+  background:#0a0f1c;border-right:1px solid var(--border-dim);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.cs-header{padding:14px 12px;border-bottom:1px solid var(--border-dim);display:flex;align-items:center;gap:8px}
+.cs-title{font-size:11px;font-family:var(--mono);color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;flex:1}
+.cs-new{
+  width:26px;height:26px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:transparent;color:var(--text-dim);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;
+  transition:all var(--trans);
+}
+.cs-new:hover{border-color:var(--accent);color:var(--accent)}
+#chat-session-list{flex:1;overflow-y:auto;padding:6px}
+#chat-session-list::-webkit-scrollbar{width:3px}
+#chat-session-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.cs-item{
+  padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;
+  font-size:12px;color:var(--text-muted);transition:all var(--trans);
+  border:1px solid transparent;margin-bottom:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.cs-item:hover{background:var(--surface-hi);color:var(--text)}
+.cs-item.active{background:var(--accent-glow);color:var(--accent);border-color:rgba(129,140,248,.2)}
+.cs-item .cs-date{font-size:10px;color:var(--text-muted);margin-top:2px}
+
+#chat-main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#chat-topbar{
+  padding:12px 20px;border-bottom:1px solid var(--border-dim);
+  display:flex;align-items:center;gap:12px;flex-shrink:0;
+  background:#0a0f1c;
+}
+#chat-current-title{font-size:13px;font-weight:500;color:var(--text-dim);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-actions{display:flex;gap:6px}
+.chat-act-btn{
+  padding:5px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:transparent;color:var(--text-muted);font-size:11px;cursor:pointer;
+  font-family:var(--font);transition:all var(--trans);
+}
+.chat-act-btn:hover{background:var(--surface);color:var(--text)}
+.chat-act-btn.active{border-color:var(--accent);color:var(--accent)}
+#chat-messages{
+  flex:1;overflow-y:auto;padding:20px 0;
+  scroll-behavior:smooth;
+}
+#chat-messages::-webkit-scrollbar{width:4px}
+#chat-messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.chat-welcome{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;color:var(--text-muted);text-align:center;padding:40px;
+}
+.chat-welcome h3{font-size:18px;font-weight:500;color:var(--text)}
+.chat-welcome p{font-size:12px;max-width:360px;line-height:1.7}
+.msg-row{display:flex;padding:8px 20px;gap:12px;transition:background var(--trans)}
+.msg-row:hover{background:rgba(255,255,255,.015)}
+.msg-avatar{
+  width:28px;height:28px;border-radius:6px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;margin-top:1px;
+}
+.msg-row.user .msg-avatar{background:var(--accent);color:#fff}
+.msg-row.agent .msg-avatar{background:var(--surface-hi);color:var(--text-dim)}
+.msg-body{flex:1;min-width:0}
+.msg-role{font-size:11px;font-weight:600;margin-bottom:3px;color:var(--text-muted)}
+.msg-row.user .msg-role{color:var(--accent)}
+.msg-content{font-size:13px;color:var(--text);line-height:1.7;word-break:break-word}
+.msg-content p{margin-bottom:.4em}
+.msg-content p:last-child{margin-bottom:0}
+.msg-content h1,.msg-content h2,.msg-content h3{margin:.5em 0 .25em;font-weight:600}
+.msg-content h1{font-size:1.15em}.msg-content h2{font-size:1.05em}.msg-content h3{font-size:1em}
+.msg-content code{font-family:var(--mono);font-size:11.5px;background:var(--surface);padding:1px 5px;border-radius:3px;color:var(--accent)}
+.msg-content pre{background:#070d1b;border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;overflow-x:auto;margin:.4em 0}
+.msg-content pre code{background:none;padding:0;color:#c9d1d9;font-size:11.5px}
+.msg-content strong{font-weight:600;color:#fff}
+.msg-content ul,.msg-content ol{padding-left:1.4em;margin:.25em 0}
+.msg-content li{margin:.1em 0}
+.msg-content blockquote{border-left:2px solid var(--accent);padding-left:12px;color:var(--text-dim);margin:.4em 0}
+.msg-content a{color:var(--accent);text-decoration:underline}
+.msg-content table{border-collapse:collapse;font-size:12px;margin:.4em 0;width:100%}
+.msg-content th,.msg-content td{border:1px solid var(--border);padding:5px 10px;text-align:left}
+.msg-content th{background:var(--surface);font-weight:600}
+.next-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.action-chip{
+  padding:3px 10px;border-radius:20px;border:1px solid var(--border);font-size:11px;
+  color:var(--text-muted);cursor:pointer;background:transparent;font-family:var(--font);
+  transition:all var(--trans);
+}
+.action-chip:hover{border-color:var(--accent);color:var(--accent)}
+.typing-row{display:flex;padding:8px 20px;gap:12px;align-items:center}
+.typing-row .msg-avatar{background:var(--surface-hi)}
+.typing-dots{display:flex;gap:3px}
+.typing-dot{width:5px;height:5px;border-radius:50%;background:var(--text-muted);animation:ldot 1.4s infinite both}
+.typing-dot:nth-child(2){animation-delay:.2s}.typing-dot:nth-child(3){animation-delay:.4s}
+#chat-input-bar{
+  padding:12px 20px;border-top:1px solid var(--border-dim);
+  display:flex;align-items:flex-end;gap:8px;flex-shrink:0;background:var(--bg);
+}
+#chat-input-wrap{
+  flex:1;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--panel);display:flex;align-items:flex-end;gap:6px;
+  padding:9px 12px;transition:border-color var(--trans);
+}
+#chat-input-wrap:focus-within{border-color:var(--accent)}
+#chat-input{
+  flex:1;background:none;border:none;outline:none;color:var(--text);
+  font-family:var(--font);font-size:13px;line-height:1.5;resize:none;
+  min-height:20px;max-height:120px;
+}
+#chat-input::placeholder{color:var(--text-muted)}
+.ci-send{
+  width:30px;height:30px;border-radius:var(--radius-sm);border:none;
+  background:var(--accent);color:#fff;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:opacity var(--trans);
+}
+.ci-send:hover{opacity:.85}
+.ci-send:disabled{opacity:.3;cursor:not-allowed}
+.crew-panel{margin-top:10px;padding-top:8px;border-top:1px solid var(--border-dim)}
+.crew-toggle{font-size:10px;color:var(--text-muted);cursor:pointer;user-select:none}
+.crew-toggle:hover{color:var(--text-dim)}
+.crew-views{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.crew-views.hidden{display:none}
+.crew-view{padding:8px 10px;border-radius:var(--radius-sm);background:#070d1b;border:1px solid var(--border-dim);font-size:11px;line-height:1.5}
+.crew-view .dept{font-size:9px;font-weight:700;color:var(--accent);font-family:var(--mono);text-transform:uppercase;margin-bottom:2px}
+
+/* ── Audit log ────────────────────────────────────── */
+.audit-filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+#audit-date{
+  padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--panel);color:var(--text);font-size:12px;font-family:var(--mono);outline:none;
+}
+#audit-date:focus{border-color:var(--accent)}
+
+/* ── Settings ─────────────────────────────────────── */
+.setting-group{margin-bottom:24px}
+.sg-title{font-size:11px;font-family:var(--mono);color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+.setting-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 14px;background:var(--panel);border:1px solid var(--border);
+  border-radius:var(--radius-sm);margin-bottom:6px;gap:16px;
+}
+.sr-key{font-size:12px;color:var(--text-dim);font-family:var(--mono);flex-shrink:0}
+.sr-val{font-size:12px;color:var(--text);text-align:right;word-break:break-all}
+.sr-val.secret{font-family:var(--mono);color:var(--text-muted)}
+
+/* ── Scrollbar global ─────────────────────────────── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ── Topbar ──────────────────────────────────────── -->
+<header id="topbar">
+  <div class="tb-logo">
+    <div class="tb-logo-mark">A</div>
+    Agent OS
+  </div>
+  <span class="tb-version" id="tb-version">v—</span>
+  <div class="tb-spacer"></div>
+  <div class="tb-breadcrumb">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span id="tb-section-name">Overview</span>
+  </div>
+  <div class="tb-spacer"></div>
+  <a href="/console" class="tb-link" style="font-family:var(--mono);font-size:11px">Console ↗</a>
+  <div class="tb-key-wrap">
+    <span class="tb-key-label">Key</span>
+    <input type="password" id="tb-key" placeholder="API_KEY_OWNER …" autocomplete="off">
+    <div id="auth-dot"></div>
+  </div>
+</header>
+
+<!-- ── Body ───────────────────────────────────────── -->
+<div id="body">
+
+<!-- ── Sidebar ────────────────────────────────────── -->
+<nav id="sidebar">
+  <ul class="nav-list" style="padding-top:10px">
+
+    <li class="nav-item active" data-section="overview" onclick="navigate('overview')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span>Overview</span>
+    </li>
+
+    <li class="nav-item" data-section="chat" onclick="navigate('chat')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>Chat</span>
+    </li>
+
+    <li class="nav-item" data-section="memory" onclick="navigate('memory')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      <span>Memory</span>
+    </li>
+
+    <li class="nav-item" data-section="channels" onclick="navigate('channels')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
+      <span>Channels</span>
+    </li>
+
+    <li class="nav-item" data-section="agents" onclick="navigate('agents')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="2" x2="9" y2="4"/><line x1="15" y1="2" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="22"/><line x1="15" y1="20" x2="15" y2="22"/><line x1="20" y1="9" x2="22" y2="9"/><line x1="20" y1="14" x2="22" y2="14"/><line x1="2" y1="9" x2="4" y2="9"/><line x1="2" y1="14" x2="4" y2="14"/></svg>
+      <span>Agents</span>
+    </li>
+
+    <div class="nav-divider"></div>
+
+    <li class="nav-item" data-section="audit" onclick="navigate('audit')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      <span>Audit</span>
+    </li>
+
+    <li class="nav-item" data-section="settings" onclick="navigate('settings')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </li>
+
+  </ul>
+</nav>
+
+<!-- ── Main content ────────────────────────────────── -->
+<main id="main">
+
+<!-- ═══ OVERVIEW ═══════════════════════════════════ -->
+<section id="sec-overview" class="section active">
+  <div class="sec-header">
+    <div class="sec-title">System Overview</div>
+    <div class="sec-sub">Live health and usage statistics</div>
+  </div>
+
+  <div class="stat-row" id="ov-stats">
+    <div class="stat-card">
+      <div class="sc-label">Memories</div>
+      <div class="sc-value accent" id="ov-mem-total">—</div>
+      <div class="sc-sub" id="ov-mem-sub">loading…</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-label">Skills</div>
+      <div class="sc-value accent" id="ov-skills-count">—</div>
+      <div class="sc-sub">registered tools</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-label">Gateway</div>
+      <div class="sc-value ok" id="ov-gateway">—</div>
+      <div class="sc-sub" id="ov-version-sub">checking…</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-label">LLM</div>
+      <div class="sc-value" id="ov-llm">—</div>
+      <div class="sc-sub" id="ov-llm-sub">loading…</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">System Health</span>
+        <button class="btn" onclick="loadOverview()" style="font-size:11px;padding:3px 10px">↻ Refresh</button>
+      </div>
+      <div class="card-body" id="ov-health-body">
+        <div class="loading"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div><span>Fetching health…</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Memory Distribution</span></div>
+      <div class="card-body" id="ov-mem-body">
+        <div class="loading"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div><span>Fetching stats…</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CHAT ════════════════════════════════════════ -->
+<section id="sec-chat" class="section">
+  <div id="chat-wrap">
+    <div id="chat-sessions">
+      <div class="cs-header">
+        <span class="cs-title">Sessions</span>
+        <button class="cs-new" onclick="chatNewSession()" title="New chat">+</button>
+      </div>
+      <div id="chat-session-list"></div>
+    </div>
+
+    <div id="chat-main">
+      <div id="chat-topbar">
+        <div id="chat-current-title">New Chat</div>
+        <div class="chat-actions">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;color:var(--text-muted)">
+            <input type="checkbox" id="chat-force-crew" style="accent-color:var(--accent)">
+            Crew
+          </label>
+          <button class="chat-act-btn" onclick="chatSealSession()">Seal</button>
+        </div>
+      </div>
+      <div id="chat-messages">
+        <div class="chat-welcome" id="chat-welcome">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.25"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <h3>Ready</h3>
+          <p>Enter your Gateway key in the top bar, then start chatting.</p>
+        </div>
+      </div>
+      <div id="chat-input-bar">
+        <div id="chat-input-wrap">
+          <textarea id="chat-input" rows="1" placeholder="Message Agent OS…"></textarea>
+          <button class="ci-send" id="chat-send-btn" onclick="chatSend()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ MEMORY ══════════════════════════════════════ -->
+<section id="sec-memory" class="section">
+  <div class="sec-header">
+    <div class="sec-title">Memory Store</div>
+    <div class="sec-sub">Semantic / episodic / procedural long-term memory</div>
+  </div>
+
+  <div class="stat-row" id="mem-stats-row">
+    <div class="stat-card"><div class="sc-label">Semantic</div><div class="sc-value" id="ms-sem" style="color:var(--warn)">—</div><div class="sc-sub">factual knowledge</div></div>
+    <div class="stat-card"><div class="sc-label">Episodic</div><div class="sc-value" id="ms-ep" style="color:var(--accent)">—</div><div class="sc-sub">conversations</div></div>
+    <div class="stat-card"><div class="sc-label">Procedural</div><div class="sc-value" id="ms-proc" style="color:var(--ok)">—</div><div class="sc-sub">workflows</div></div>
+    <div class="stat-card"><div class="sc-label">Total</div><div class="sc-value accent" id="ms-total">—</div><div class="sc-sub">all records</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Recent Memories</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="loadMemory()" style="font-size:11px;padding:3px 10px">↻</button>
+      </div>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div id="mem-table-wrap">
+        <div class="loading" style="padding:20px"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div><span>Loading memories…</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CHANNELS ═══════════════════════════════════ -->
+<section id="sec-channels" class="section">
+  <div class="sec-header">
+    <div class="sec-title">Channels</div>
+    <div class="sec-sub">Connected integration channels</div>
+  </div>
+
+  <div class="channel-grid">
+
+    <div class="ch-card">
+      <div class="ch-card-top">
+        <div class="ch-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.25 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z"/></svg>
+        </div>
+        <div>
+          <div class="ch-name">WhatsApp</div>
+          <div id="ch-whatsapp-status"></div>
+        </div>
+      </div>
+      <div class="ch-desc">Receives messages via Baileys bridge. Supports DM and group policies.</div>
+      <div class="ch-footer">
+        <span id="ch-wa-badge" class="badge muted"><span class="badge-dot"></span>Checking…</span>
+      </div>
+    </div>
+
+    <div class="ch-card">
+      <div class="ch-card-top">
+        <div class="ch-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        </div>
+        <div><div class="ch-name">Console</div></div>
+      </div>
+      <div class="ch-desc">Web terminal for direct API access. Powers this dashboard's Chat tab.</div>
+      <div class="ch-footer">
+        <span class="badge ok"><span class="badge-dot"></span>Active</span>
+        <button class="btn" onclick="navigate('chat')">Open Chat</button>
+      </div>
+    </div>
+
+    <div class="ch-card">
+      <div class="ch-card-top">
+        <div class="ch-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2"><path d="M22.08 9c-1-4.15-4.93-7-9.58-7A10 10 0 0 0 3.6 17.4L2 22l4.6-1.6A10 10 0 0 0 22 12c0-1.04-.15-2.04-.44-3"/><path d="M9 11c.5-1 1.6-2 3-2s2.5 1 2.5 2.5c0 2-2.5 3.5-2.5 3.5"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div><div class="ch-name">Slack</div></div>
+      </div>
+      <div class="ch-desc">Slash commands and event subscriptions via Bolt. Set SLACK_BOT_TOKEN.</div>
+      <div class="ch-footer">
+        <span id="ch-slack-badge" class="badge muted"><span class="badge-dot"></span>Not configured</span>
+      </div>
+    </div>
+
+    <div class="ch-card" style="border-style:dashed;opacity:.55">
+      <div class="ch-card-top">
+        <div class="ch-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+        <div><div class="ch-name" style="color:var(--text-muted)">Add Channel</div></div>
+      </div>
+      <div class="ch-desc">Telegram, Wecom, Email, Voice — planned.</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══ AGENTS ══════════════════════════════════════ -->
+<section id="sec-agents" class="section">
+  <div class="sec-header">
+    <div class="sec-title">Agent Skills</div>
+    <div class="sec-sub">Registered tools available to the router engine</div>
+  </div>
+
+  <div id="agents-grid" class="skill-grid">
+    <div class="loading"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div><span>Loading skills…</span></div>
+  </div>
+
+  <div class="card" style="margin-top:24px">
+    <div class="card-header"><span class="card-title">Crew Departments</span></div>
+    <div class="card-body" style="padding:0">
+      <table class="data-table">
+        <thead><tr><th>Department</th><th>Role</th><th>Phase</th></tr></thead>
+        <tbody>
+          <tr><td><span class="primary">Finance</span></td><td><code>finance</code></td><td>Phase 1 + 2</td></tr>
+          <tr><td><span class="primary">Operations</span></td><td><code>operations</code></td><td>Phase 1 + 2</td></tr>
+          <tr><td><span class="primary">Legal</span></td><td><code>legal</code></td><td>Phase 1 + 2</td></tr>
+          <tr><td><span class="primary">Strategy</span></td><td><code>strategy</code></td><td>Phase 1 + 2</td></tr>
+          <tr><td><span class="primary">Chief of Staff</span></td><td><code>chief_of_staff</code></td><td>Phase 3 synthesis</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ AUDIT ═══════════════════════════════════════ -->
+<section id="sec-audit" class="section">
+  <div class="sec-header">
+    <div class="sec-title">Audit Log</div>
+    <div class="sec-sub">Request trace — requires root key</div>
+  </div>
+
+  <div class="audit-filters">
+    <input type="date" id="audit-date" placeholder="YYYY-MM-DD">
+    <button class="btn primary" onclick="loadAudit()">Load</button>
+    <button class="btn" onclick="document.getElementById('audit-date').value='';loadAudit()">All dates</button>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <div id="audit-body">
+        <div class="empty-state">Set a date and click Load, or clear to view all recent entries.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SETTINGS ════════════════════════════════════ -->
+<section id="sec-settings" class="section">
+  <div class="sec-header">
+    <div class="sec-title">Configuration</div>
+    <div class="sec-sub">Runtime environment — edit .env and restart to apply changes</div>
+  </div>
+
+  <div class="setting-group">
+    <div class="sg-title">Gateway</div>
+    <div class="setting-row"><span class="sr-key">HOST</span><span class="sr-val" id="cfg-host">—</span></div>
+    <div class="setting-row"><span class="sr-key">PORT</span><span class="sr-val" id="cfg-port">—</span></div>
+    <div class="setting-row"><span class="sr-key">VERSION</span><span class="sr-val" id="cfg-version">—</span></div>
+  </div>
+
+  <div class="setting-group">
+    <div class="sg-title">Authentication</div>
+    <div class="setting-row"><span class="sr-key">API_KEY_OWNER</span><span class="sr-val secret" id="cfg-key-owner">—</span></div>
+    <div class="setting-row"><span class="sr-key">API_KEY_CHANNEL</span><span class="sr-val secret" id="cfg-key-channel">—</span></div>
+    <div class="setting-row"><span class="sr-key">JWT_SECRET</span><span class="sr-val secret">••••••••</span></div>
+  </div>
+
+  <div class="setting-group">
+    <div class="sg-title">LLM</div>
+    <div class="setting-row"><span class="sr-key">DEEPSEEK_MODEL</span><span class="sr-val" id="cfg-llm-model">—</span></div>
+    <div class="setting-row"><span class="sr-key">DEEPSEEK_BASE_URL</span><span class="sr-val" id="cfg-llm-url">—</span></div>
+    <div class="setting-row"><span class="sr-key">DEEPSEEK_API_KEY</span><span class="sr-val secret">••••••••</span></div>
+  </div>
+
+  <div class="setting-group">
+    <div class="sg-title">Memory</div>
+    <div class="setting-row"><span class="sr-key">MEMORY_DB_PATH</span><span class="sr-val" id="cfg-mem-path">—</span></div>
+    <div class="setting-row"><span class="sr-key">MEMORY_V2_ENABLED</span><span class="sr-val" id="cfg-mem-v2">—</span></div>
+    <div class="setting-row"><span class="sr-key">MEMORY_RETRIEVAL_TOP_K</span><span class="sr-val" id="cfg-mem-topk">—</span></div>
+  </div>
+
+  <div class="setting-group">
+    <div class="sg-title">Audit</div>
+    <div class="setting-row"><span class="sr-key">AUDIT_ENABLED</span><span class="sr-val" id="cfg-audit">—</span></div>
+    <div class="setting-row"><span class="sr-key">AUDIT_RETENTION_DAYS</span><span class="sr-val" id="cfg-audit-days">—</span></div>
+  </div>
+</section>
+
+</main>
+</div><!-- #body -->
+</div><!-- #app -->
+
+<script>
+// ── State ─────────────────────────────────────────
+let _section = 'overview';
+let _apiKey = localStorage.getItem('agentos_key') || '';
+const SESSIONS_KEY = 'agentos_db_sessions';
+let _sessions = JSON.parse(localStorage.getItem(SESSIONS_KEY) || '[]');
+let _activeSessionId = null;
+let _activeMsgs = [];
+
+// ── Init ──────────────────────────────────────────
+const tbKey = document.getElementById('tb-key');
+tbKey.value = _apiKey;
+tbKey.addEventListener('input', () => {
+  _apiKey = tbKey.value.trim();
+  localStorage.setItem('agentos_key', _apiKey);
+  document.getElementById('auth-dot').className = '';
+});
+
+document.getElementById('chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatSend(); }
+});
+document.getElementById('chat-input').addEventListener('input', () => {
+  const el = document.getElementById('chat-input');
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 110) + 'px';
+});
+
+loadVersion();
+loadOverview();
+renderChatSessions();
+if (!_activeSessionId) chatNewSession();
+
+// ── Navigation ────────────────────────────────────
+function navigate(section) {
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.section === section);
+  });
+  document.querySelectorAll('.section').forEach(el => {
+    el.classList.toggle('active', el.id === `sec-${section}`);
+  });
+  document.getElementById('tb-section-name').textContent =
+    section.charAt(0).toUpperCase() + section.slice(1);
+  _section = section;
+
+  // Lazy-load section data
+  if (section === 'overview') loadOverview();
+  if (section === 'memory') loadMemory();
+  if (section === 'agents') loadAgents();
+  if (section === 'channels') loadChannels();
+  if (section === 'settings') loadSettings();
+}
+
+// ── API helpers ───────────────────────────────────
+function apiH(extra = {}) {
+  return { 'Content-Type': 'application/json', 'X-API-Key': _apiKey, ...extra };
+}
+function setAuthed(ok) {
+  document.getElementById('auth-dot').className = ok ? 'ok' : 'err';
+}
+
+// ── Version ───────────────────────────────────────
+async function loadVersion() {
+  try {
+    const r = await fetch('/health');
+    if (r.ok) {
+      const h = await fetch('/openclaw/__openclaw/control-ui-config.json').then(x => x.ok ? x.json() : {});
+      if (h.serverVersion) document.getElementById('tb-version').textContent = `v${h.serverVersion}`;
+    }
+  } catch {}
+}
+
+// ── Overview ──────────────────────────────────────
+async function loadOverview() {
+  if (_section !== 'overview' && !document.getElementById('sec-overview').classList.contains('active')) return;
+  const key = _apiKey;
+  if (!key) { document.getElementById('ov-health-body').innerHTML = '<div class="empty-state">Enter Gateway key to view health.</div>'; return; }
+
+  try {
+    const r = await fetch('/health/extended', { headers: { 'X-API-Key': key } });
+    if (r.status === 401 || r.status === 403) { setAuthed(false); return; }
+    if (!r.ok) return;
+    const d = await r.json();
+    setAuthed(true);
+
+    // Gateway stat
+    document.getElementById('ov-gateway').textContent = d.status || 'alive';
+    document.getElementById('ov-gateway').className = 'sc-value ok';
+    if (d.version) document.getElementById('ov-version-sub').textContent = `v${d.version}`;
+    if (d.tb_version) document.getElementById('tb-version').textContent = `v${d.version}`;
+
+    // LLM stat
+    const llmOk = d.llm?.ok;
+    document.getElementById('ov-llm').textContent = llmOk ? 'Online' : 'No key';
+    document.getElementById('ov-llm').className = `sc-value ${llmOk ? 'ok' : 'warn'}`;
+    document.getElementById('ov-llm-sub').textContent = d.llm?.model || '';
+
+    // Skills count
+    if (d.skills) {
+      const n = Array.isArray(d.skills) ? d.skills.length : Object.keys(d.skills).length;
+      document.getElementById('ov-skills-count').textContent = n;
+    }
+
+    // Health table
+    const rows = [
+      ['Gateway', d.status, d.status === 'alive' ? 'ok' : 'err'],
+      ['Database', d.db?.ok ? 'OK' : 'Error', d.db?.ok ? 'ok' : 'err'],
+      ['LLM', llmOk ? 'Configured' : 'Missing key', llmOk ? 'ok' : 'warn'],
+      ['WhatsApp bridge', d.whatsapp_bridge?.ok ? 'Connected' : (d.whatsapp_bridge?.ok === false ? 'Timeout' : 'Unknown'), d.whatsapp_bridge?.ok ? 'ok' : 'muted'],
+      ['Memory V2', d.memory_v2?.enabled ? 'Enabled' : 'Disabled', d.memory_v2?.enabled ? 'ok' : 'muted'],
+      ['Audit', d.audit?.enabled ? 'Enabled' : 'Disabled', d.audit?.enabled ? 'ok' : 'muted'],
+    ];
+    document.getElementById('ov-health-body').innerHTML = rows.map(([k, v, cls]) =>
+      `<div class="health-row"><span class="hr-key">${k}</span><span class="badge ${cls}"><span class="badge-dot"></span>${v}</span></div>`
+    ).join('');
+  } catch {}
+
+  // Memory stats
+  try {
+    const r2 = await fetch('/memory/stats', { headers: { 'X-API-Key': key } });
+    if (!r2.ok) return;
+    const s = await r2.json();
+    const total = (s.semantic || 0) + (s.episodic || 0) + (s.procedural || 0);
+    document.getElementById('ov-mem-total').textContent = total;
+    document.getElementById('ov-mem-sub').textContent = `sem ${s.semantic||0} · ep ${s.episodic||0} · proc ${s.procedural||0}`;
+    document.getElementById('ov-mem-body').innerHTML = `
+      <div class="health-row"><span class="hr-key">Semantic</span><span class="hr-val" style="color:var(--warn)">${s.semantic||0}</span></div>
+      <div class="health-row"><span class="hr-key">Episodic</span><span class="hr-val" style="color:var(--accent)">${s.episodic||0}</span></div>
+      <div class="health-row"><span class="hr-key">Procedural</span><span class="hr-val" style="color:var(--ok)">${s.procedural||0}</span></div>
+      <div class="health-row"><span class="hr-key">Total</span><span class="hr-val">${total}</span></div>`;
+  } catch {}
+}
+
+// ── Memory ────────────────────────────────────────
+async function loadMemory() {
+  if (!_apiKey) { document.getElementById('mem-table-wrap').innerHTML = '<div class="empty-state">Enter Gateway key to view memory.</div>'; return; }
+  document.getElementById('mem-table-wrap').innerHTML = '<div class="loading"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div><span>Loading…</span></div>';
+  try {
+    const [sR, lR] = await Promise.all([
+      fetch('/memory/stats', { headers: { 'X-API-Key': _apiKey } }),
+      fetch('/memory/list?limit=40', { headers: { 'X-API-Key': _apiKey } }),
+    ]);
+    if (!sR.ok) { document.getElementById('mem-table-wrap').innerHTML = '<div class="empty-state">Auth failed — check Gateway key.</div>'; return; }
+    const stats = await sR.json();
+    const mems = lR.ok ? await lR.json() : [];
+    document.getElementById('ms-sem').textContent = stats.semantic || 0;
+    document.getElementById('ms-ep').textContent = stats.episodic || 0;
+    document.getElementById('ms-proc').textContent = stats.procedural || 0;
+    document.getElementById('ms-total').textContent = (stats.semantic || 0) + (stats.episodic || 0) + (stats.procedural || 0);
+    if (!mems.length) { document.getElementById('mem-table-wrap').innerHTML = '<div class="empty-state">No memories yet.</div>'; return; }
+    const rows = mems.map(m => `<tr>
+      <td><code>${esc(m.memory_type)}</code></td>
+      <td><span class="primary">${esc((m.content||'').slice(0,80))}${m.content?.length>80?'…':''}</span></td>
+      <td>${m.priority?.toFixed(2) ?? '—'}</td>
+      <td>${m.access_count ?? 0}</td>
+      <td style="font-family:var(--mono);font-size:10px">${(m.created_at||'').slice(0,10)}</td>
+    </tr>`).join('');
+    document.getElementById('mem-table-wrap').innerHTML = `
+      <table class="data-table">
+        <thead><tr><th>Type</th><th>Content</th><th>Priority</th><th>Access</th><th>Created</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  } catch (e) { document.getElementById('mem-table-wrap').innerHTML = `<div class="empty-state">Error: ${esc(e.message)}</div>`; }
+}
+
+// ── Agents (skills) ───────────────────────────────
+async function loadAgents() {
+  try {
+    const r = await fetch('/health/extended', { headers: { 'X-API-Key': _apiKey } });
+    if (!r.ok) { loadAgentsFallback(); return; }
+    const d = await r.json();
+    let skills = d.skills || [];
+    if (!Array.isArray(skills)) skills = Object.entries(skills).map(([name, v]) => ({ name, ...v }));
+    if (!skills.length) { loadAgentsFallback(); return; }
+    renderSkills(skills);
+  } catch { loadAgentsFallback(); }
+}
+async function loadAgentsFallback() {
+  // Use /health/skills if available, otherwise just show placeholder
+  try {
+    const r = await fetch('/health/skills', { headers: { 'X-API-Key': _apiKey } });
+    if (r.ok) { const d = await r.json(); renderSkills(d.skills || []); return; }
+  } catch {}
+  document.getElementById('agents-grid').innerHTML = '<div class="empty-state">Enter Gateway key to load skills.</div>';
+}
+function renderSkills(skills) {
+  if (!skills.length) { document.getElementById('agents-grid').innerHTML = '<div class="empty-state">No skills registered.</div>'; return; }
+  document.getElementById('agents-grid').innerHTML = skills.map(s =>
+    `<div class="skill-chip">
+       <div class="sk-name">${esc(s.name || s)}</div>
+       <div class="sk-desc">${esc((s.description || '').slice(0, 90))}</div>
+     </div>`
+  ).join('');
+}
+
+// ── Channels ──────────────────────────────────────
+async function loadChannels() {
+  try {
+    const r = await fetch('/health/whatsapp', { method: 'POST' });
+    const d = r.ok ? await r.json() : {};
+    const ok = d.ok === true;
+    document.getElementById('ch-wa-badge').className = `badge ${ok ? 'ok' : 'warn'}`;
+    document.getElementById('ch-wa-badge').innerHTML = `<span class="badge-dot"></span>${ok ? 'Bridge online' : 'Bridge offline'}`;
+  } catch {
+    document.getElementById('ch-wa-badge').className = 'badge muted';
+    document.getElementById('ch-wa-badge').innerHTML = '<span class="badge-dot"></span>Unknown';
+  }
+}
+
+// ── Audit ─────────────────────────────────────────
+async function loadAudit() {
+  if (!_apiKey) { document.getElementById('audit-body').innerHTML = '<div class="empty-state">Enter Gateway key (root role required).</div>'; return; }
+  const date = document.getElementById('audit-date').value;
+  document.getElementById('audit-body').innerHTML = '<div class="loading"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div><span>Loading…</span></div>';
+  try {
+    const r = await fetch('/audit/search', {
+      method: 'POST',
+      headers: apiH(),
+      body: JSON.stringify({ date: date || null, limit: 100 }),
+    });
+    if (r.status === 403) { document.getElementById('audit-body').innerHTML = '<div class="empty-state">Root key required for audit access.</div>'; return; }
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const entries = d.results || [];
+    if (!entries.length) { document.getElementById('audit-body').innerHTML = '<div class="empty-state">No audit entries found.</div>'; return; }
+    const rows = entries.map(e => `<tr>
+      <td style="font-family:var(--mono);font-size:10px">${esc((e.ts||e.timestamp||'').slice(0,19))}</td>
+      <td><code>${esc(e.event||'')}</code></td>
+      <td>${esc(e.channel||'')}</td>
+      <td>${esc(e.user_id||'')}</td>
+      <td>${esc((e.raw_input||'').slice(0,50))}</td>
+    </tr>`).join('');
+    document.getElementById('audit-body').innerHTML = `
+      <table class="data-table">
+        <thead><tr><th>Timestamp</th><th>Event</th><th>Channel</th><th>User</th><th>Input</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  } catch (e) { document.getElementById('audit-body').innerHTML = `<div class="empty-state">Error: ${esc(e.message)}</div>`; }
+}
+
+// ── Settings ──────────────────────────────────────
+async function loadSettings() {
+  try {
+    const r = await fetch('/health/extended', { headers: { 'X-API-Key': _apiKey } });
+    if (!r.ok) return;
+    const d = await r.json();
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val ?? '—'; };
+    set('cfg-version', d.version);
+    set('cfg-llm-model', d.llm?.model);
+    set('cfg-llm-url', d.llm?.base_url);
+    set('cfg-mem-path', d.db?.path);
+    set('cfg-mem-v2', d.memory_v2?.enabled ? 'true' : 'false');
+    set('cfg-audit', d.audit?.enabled ? 'true' : 'false');
+    set('cfg-audit-days', d.audit?.retention_days);
+    // Key hints (never show actual keys)
+    set('cfg-key-owner', d.auth?.owner_key_set ? '••• configured' : '— not set');
+    set('cfg-key-channel', d.auth?.channel_key_set ? '••• configured' : '— not set');
+  } catch {}
+}
+
+// ── Chat ──────────────────────────────────────────
+function chatNewSession() {
+  if (_activeMsgs.length > 0) _chatSave();
+  _activeSessionId = Date.now().toString();
+  _activeMsgs = [];
+  const area = document.getElementById('chat-messages');
+  area.innerHTML = '';
+  _chatAppendWelcome();
+  document.getElementById('chat-current-title').textContent = 'New Chat';
+  renderChatSessions();
+}
+function _chatAppendWelcome() {
+  document.getElementById('chat-messages').insertAdjacentHTML('afterbegin', `
+    <div class="chat-welcome" id="chat-welcome">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <h3>Ready</h3>
+      <p>Enter your Gateway key in the top bar, then start chatting.</p>
+    </div>`);
+}
+function renderChatSessions() {
+  const list = document.getElementById('chat-session-list');
+  if (!_sessions.length) { list.innerHTML = '<div style="padding:14px;font-size:11px;color:var(--text-muted);text-align:center">No sessions yet</div>'; return; }
+  list.innerHTML = _sessions.map(s => `
+    <div class="cs-item${s.id === _activeSessionId ? ' active' : ''}" onclick="chatLoadSession('${s.id}')">
+      <div>${esc(s.preview)}</div>
+      <div class="cs-date">${new Date(s.ts).toLocaleDateString()}</div>
+    </div>`).join('');
+}
+function _chatSave() {
+  if (!_activeSessionId || !_activeMsgs.length) return;
+  const idx = _sessions.findIndex(s => s.id === _activeSessionId);
+  const preview = _activeMsgs[0]?.content?.slice(0, 48) || 'Chat';
+  const item = { id: _activeSessionId, preview, ts: Date.now(), messages: _activeMsgs };
+  if (idx >= 0) _sessions[idx] = item; else _sessions.unshift(item);
+  if (_sessions.length > 30) _sessions = _sessions.slice(0, 30);
+  localStorage.setItem(SESSIONS_KEY, JSON.stringify(_sessions));
+  renderChatSessions();
+}
+function chatLoadSession(id) {
+  if (_activeMsgs.length > 0) _chatSave();
+  const s = _sessions.find(x => x.id === id);
+  if (!s) return;
+  _activeSessionId = id;
+  _activeMsgs = s.messages || [];
+  const area = document.getElementById('chat-messages');
+  area.innerHTML = '';
+  _activeMsgs.forEach(m => _chatRenderMsg(m.role, m.content, m.actions, m.crewViews));
+  document.getElementById('chat-current-title').textContent = s.preview || 'Chat';
+  renderChatSessions();
+}
+function chatAppendMsg(role, content, actions, crewViews) {
+  document.getElementById('chat-welcome')?.remove();
+  _activeMsgs.push({ role, content, actions: actions || [], crewViews });
+  _chatSave();
+  _chatRenderMsg(role, content, actions, crewViews);
+}
+function _chatRenderMsg(role, content, actions, crewViews) {
+  const area = document.getElementById('chat-messages');
+  const initials = role === 'user' ? 'U' : 'A';
+  let html = `<div class="msg-row ${role}">
+    <div class="msg-avatar">${initials}</div>
+    <div class="msg-body">
+      <div class="msg-role">${role === 'user' ? 'You' : 'Agent OS'}</div>
+      <div class="msg-content">${role === 'agent' ? renderMd(content) : esc(content).replace(/\n/g,'<br>')}</div>`;
+  if (actions && actions.length) {
+    html += '<div class="next-actions">' + actions.map(a => `<button class="action-chip" onclick="chatFill(${JSON.stringify(a)})">${esc(a)}</button>`).join('') + '</div>';
+  }
+  if (crewViews && Object.keys(crewViews).length) {
+    const uid = 'cv' + Date.now();
+    html += `<div class="crew-panel"><span class="crew-toggle" onclick="document.getElementById('${uid}').classList.toggle('hidden')">▾ Department Views</span>
+      <div class="crew-views hidden" id="${uid}">` +
+      Object.entries(crewViews).map(([dept, view]) => `<div class="crew-view"><div class="dept">${esc(dept)}</div>${esc(view)}</div>`).join('') +
+      '</div></div>';
+  }
+  html += '</div></div>';
+  area.insertAdjacentHTML('beforeend', html);
+  area.scrollTop = area.scrollHeight;
+}
+function chatFill(t) { const el = document.getElementById('chat-input'); el.value = t; el.focus(); }
+function _chatShowTyping() {
+  const area = document.getElementById('chat-messages');
+  area.insertAdjacentHTML('beforeend', `<div class="typing-row" id="chat-typing">
+    <div class="msg-avatar" style="background:var(--surface-hi)">A</div>
+    <div class="typing-dots"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>
+  </div>`);
+  area.scrollTop = area.scrollHeight;
+}
+function _chatHideTyping() { document.getElementById('chat-typing')?.remove(); }
+
+async function chatSend() {
+  const text = document.getElementById('chat-input').value.trim();
+  if (!text) return;
+  if (!_apiKey) { chatAppendMsg('agent', 'Please enter the Gateway key in the top bar.', [], null); return; }
+
+  document.getElementById('chat-input').value = '';
+  document.getElementById('chat-input').style.height = 'auto';
+  document.getElementById('chat-send-btn').disabled = true;
+  chatAppendMsg('user', text, [], null);
+  document.getElementById('chat-current-title').textContent = text.slice(0, 45);
+  _chatShowTyping();
+
+  try {
+    const r = await fetch('/console/query', {
+      method: 'POST',
+      headers: apiH(),
+      body: JSON.stringify({
+        query: text,
+        include_memory: true,
+        force_crew: document.getElementById('chat-force-crew').checked,
+      }),
+    });
+    _chatHideTyping();
+    if (r.status === 401 || r.status === 403) { setAuthed(false); chatAppendMsg('agent', 'Auth failed — check Gateway key.', [], null); return; }
+    if (!r.ok) { chatAppendMsg('agent', `Request failed (${r.status}).`, [], null); return; }
+    setAuthed(true);
+    const d = await r.json();
+    chatAppendMsg('agent', d.answer || d.brief || '(empty)', d.next_actions || [], d.crew_views || null);
+  } catch (e) {
+    _chatHideTyping();
+    chatAppendMsg('agent', 'Connection failed: ' + e.message, [], null);
+  } finally {
+    document.getElementById('chat-send-btn').disabled = false;
+    document.getElementById('chat-input').focus();
+  }
+}
+async function chatSealSession() {
+  try {
+    const r = await fetch('/memory/seal', { method: 'POST', headers: apiH() });
+    if (r.status === 403) { chatAppendMsg('agent', '封存需要 root 权限。', [], null); return; }
+    const d = await r.json();
+    chatAppendMsg('agent', d.status === 'sealed' ? `Session sealed.\nTopic: ${d.topic||'—'}\n${d.summary||''}` : 'No active session to seal.', [], null);
+  } catch (e) { chatAppendMsg('agent', 'Seal failed: ' + e.message, [], null); }
+}
+
+// ── Markdown renderer ─────────────────────────────
+function renderMd(raw) {
+  if (!raw) return '';
+  let t = raw;
+  t = t.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, l, c) => `<pre><code>${esc(c.trim())}</code></pre>`);
+  t = t.replace(/`([^`\n]+)`/g, (_, c) => `<code>${esc(c)}</code>`);
+  t = t.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  t = t.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  t = t.replace(/^#{3}\s+(.+)$/gm, '<h3>$1</h3>');
+  t = t.replace(/^#{2}\s+(.+)$/gm, '<h2>$1</h2>');
+  t = t.replace(/^#\s+(.+)$/gm, '<h1>$1</h1>');
+  t = t.replace(/^---+$/gm, '<hr>');
+  t = t.replace(/^>\s+(.+)$/gm, '<blockquote>$1</blockquote>');
+  t = t.replace(/((?:^[\-\*]\s+.+\n?)+)/gm, m => `<ul>${m.trim().split('\n').map(l=>`<li>${l.replace(/^[\-\*]\s+/,'')}</li>`).join('')}</ul>`);
+  t = t.replace(/((?:^\d+\.\s+.+\n?)+)/gm, m => `<ol>${m.trim().split('\n').map(l=>`<li>${l.replace(/^\d+\.\s+/,'')}</li>`).join('')}</ol>`);
+  t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  t = t.replace(/\n{2,}/g, '\n\n');
+  const parts = t.split(/\n{2,}/);
+  return parts.map(p => {
+    const tr = p.trim();
+    if (!tr) return '';
+    if (/^<(h[1-6]|ul|ol|pre|blockquote|hr)/.test(tr)) return tr;
+    return `<p>${tr.replace(/\n/g,'<br>')}</p>`;
+  }).filter(Boolean).join('');
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+</script>
+</body>
+</html>
