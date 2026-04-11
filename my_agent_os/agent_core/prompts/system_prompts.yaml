@@ -42,6 +42,18 @@ decision_engine: |
 
   Then answer in plain language aligned with the user's question.
 
+# ── Task Decomposition & Agentic Step Prompts ─────────────────────────────────
+# These are used by agentic_loop.py — NOT exposed to the user.
+
+agentic_routing_hint: |
+  When a task involves multiple information sources, file operations, external searches,
+  or step-by-step computation, the agent will work iteratively:
+    READ   → gather data (memory, files, search)
+    THINK  → decide what to do next with what was gathered
+    WRITE  → produce output or update state (files, memory)
+    EXECUTE → run code, call APIs, trigger tools
+  Each step builds on the previous. The user sees only the final synthesised answer.
+
 # Channel-specific tone overrides
 channel_mobile: |
   You are responding via MOBILE. Be ultra-brief.

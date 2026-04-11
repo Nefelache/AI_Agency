@@ -31,7 +31,8 @@ _memory_engine = None
 _crew_orchestrator = None
 _PROMPTS_CACHE: dict | None = None
 
-CREW_COMPLEXITY_THRESHOLD = 0.6  # Only trigger crew for genuinely complex tasks (score 4+)
+CREW_COMPLEXITY_THRESHOLD = 0.75   # score 4+ → multi-department strategic analysis
+AGENTIC_COMPLEXITY_THRESHOLD = 0.45  # score 3+ → multi-step tool-calling loop
 
 
 def set_memory_engine(engine) -> None:
@@ -102,14 +103,24 @@ async def route(
         + json.dumps(preferences, ensure_ascii=False)
     )
 
-    # Complexity routing: crew (console only) or single agent
-    if _crew_orchestrator and channel == "console":
-        if force_crew:
+    # Complexity routing — three tiers (console channel only)
+    if channel == "console":
+        if force_crew and _crew_orchestrator:
             return await _route_via_crew(raw_input, user_id, system_msg, user_payload_parts, channel, start_ts)
+
         complexity = await _check_complexity(raw_input)
-        if complexity >= CREW_COMPLEXITY_THRESHOLD:
-            logger.info("Crew routing triggered: complexity=%.2f input=%.60s", complexity, raw_input)
+        logger.info("Complexity score=%.2f for input=%.60s", complexity, raw_input)
+
+        if complexity >= CREW_COMPLEXITY_THRESHOLD and _crew_orchestrator:
+            logger.info("→ Crew path")
             return await _route_via_crew(raw_input, user_id, system_msg, user_payload_parts, channel, start_ts)
+
+        if complexity >= AGENTIC_COMPLEXITY_THRESHOLD:
+            logger.info("→ Agentic loop path")
+            memory_ctx = "\n".join(
+                p for p in user_payload_parts[1:] if "[Retrieved Memories]" in p or "[Key Decisions]" in p
+            )
+            return await _route_via_agentic(raw_input, user_id, memory_ctx, channel, start_ts)
 
     # Skill dispatch: check if the input maps to a registered skill
     skill_result = await _try_skill_dispatch(raw_input, user_payload_parts)
@@ -164,6 +175,71 @@ async def _check_complexity(raw_input: str) -> float:
     except Exception as e:
         logger.warning("Complexity check failed: %s", e)
         return 0.0
+
+
+async def _route_via_agentic(
+    raw_input: str,
+    user_id: str,
+    memory_context: str,
+    channel: str,
+    start_ts: float | None = None,
+) -> dict[str, Any]:
+    """ReAct-style iterative loop: think → read/write/execute → repeat → done."""
+    from my_agent_os.agent_core.agentic_loop import run_agentic_loop
+
+    tools = list_tools()
+
+    async def _skill_exec(skill_name: str, params: dict) -> dict:
+        tool = get_tool(skill_name)
+        raw = await tool.execute(params)
+        return normalize_skill_result(raw if isinstance(raw, dict) else {})
+
+    async def _mem_search(query: str) -> str:
+        if _memory_engine is None:
+            return ""
+        try:
+            ctx = await _memory_engine.retrieve(user_id, query)
+            parts = []
+            if ctx.summary_layer:
+                parts.append(ctx.summary_layer)
+            if ctx.decision_layer:
+                parts.append(ctx.decision_layer)
+            return "\n".join(parts)
+        except Exception:
+            return ""
+
+    try:
+        result = await run_agentic_loop(
+            task=raw_input,
+            memory_context=memory_context,
+            llm=call_llm,
+            skill_executor=_skill_exec,
+            memory_searcher=_mem_search,
+            tools=tools,
+        )
+    except Exception as e:
+        logger.error("Agentic loop crashed, falling back to single LLM: %s", e)
+        prompts = _load_prompts()
+        system_msg = _build_system_message(prompts, channel)
+        raw_response = await call_llm(system_message=system_msg, user_message=raw_input)
+        result = {"answer": raw_response.strip(), "steps": [], "tool_results": []}
+
+    answer = result.get("answer") or "(no answer)"
+    parsed = {"answer": sanitize_output(answer), "sources": None, "next_actions": [], "route_path": "agentic"}
+
+    if _memory_engine:
+        _memory_engine.process_turn_background(user_id, raw_input, answer)
+
+    if start_ts is not None:
+        latency_ms = (time.perf_counter() - start_ts) * 1000
+        try:
+            from my_agent_os.enterprise.audit import log_route
+            log_route(session_id=f"{channel}:{user_id}", channel=channel, user_id=user_id,
+                      raw_input=raw_input, response=parsed, latency_ms=round(latency_ms, 2))
+        except Exception:
+            pass
+
+    return parsed
 
 
 async def _route_via_crew(
