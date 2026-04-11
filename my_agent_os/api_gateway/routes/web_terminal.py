@@ -5,6 +5,8 @@ Provides full context retrieval, memory querying, and heavy-duty planning.
 This is where "Control Aesthetic" meets full information density.
 """
 
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -27,6 +29,39 @@ class ConsoleResponse(BaseModel):
     crew_views: dict[str, str] | None = None
 
 
+def _coerce_console_payload(result: dict[str, Any]) -> dict[str, Any]:
+    """LLMs often return sources as strings or mixed shapes — avoid response_model 500s."""
+    answer = result.get("answer") or result.get("brief") or ""
+    if not isinstance(answer, str):
+        answer = str(answer)
+
+    raw_src = result.get("sources")
+    sources: list[dict] | None = None
+    if isinstance(raw_src, list) and raw_src:
+        cleaned = [x for x in raw_src if isinstance(x, dict)]
+        sources = cleaned or None
+
+    raw_next = result.get("next_actions")
+    if isinstance(raw_next, list):
+        next_actions = [str(x) for x in raw_next]
+    elif raw_next:
+        next_actions = [str(raw_next)]
+    else:
+        next_actions = []
+
+    raw_crew = result.get("crew_views")
+    crew_views: dict[str, str] | None = None
+    if isinstance(raw_crew, dict) and raw_crew:
+        crew_views = {str(k): str(v) for k, v in raw_crew.items() if v is not None}
+
+    return {
+        "answer": answer,
+        "sources": sources,
+        "next_actions": next_actions,
+        "crew_views": crew_views,
+    }
+
+
 @router.post("/query", response_model=ConsoleResponse)
 async def handle_console(
     q: ConsoleQuery,
@@ -41,9 +76,5 @@ async def handle_console(
         with_memory=q.include_memory,
         force_crew=q.force_crew,
     )
-    return ConsoleResponse(
-        answer=result.get("answer", ""),
-        sources=result.get("sources"),
-        next_actions=result.get("next_actions", []),
-        crew_views=result.get("crew_views"),
-    )
+    coerced = _coerce_console_payload(result if isinstance(result, dict) else {})
+    return ConsoleResponse(**coerced)

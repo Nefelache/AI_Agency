@@ -260,7 +260,10 @@ def _parse_response(raw: str, channel: str) -> dict[str, Any]:
             "brief": (answer or raw.strip())[:200],
         }
     raw_sources = data.get("sources") or data.get("memory_sources")
-    sources = raw_sources if isinstance(raw_sources, list) else None
+    sources = None
+    if isinstance(raw_sources, list) and raw_sources:
+        dict_only = [x for x in raw_sources if isinstance(x, dict)]
+        sources = dict_only or None
 
     return {
         "answer": answer,
