@@ -168,6 +168,37 @@ async def route(
     return parsed
 
 
+def _format_trace(steps: list[str]) -> list[str]:
+    """Convert raw agentic loop step strings into icon-prefixed display lines."""
+    icons = {
+        "search_memory": "🧠", "web_search": "🌐", "pdf_reader": "📄",
+        "file_manager": "📁", "code_runner": "⚙️", "http_fetch": "🔗",
+        "audio_transcribe": "🎙️", "image_analyzer": "🖼️",
+        "reminder": "⏰", "email": "📧", "weather": "🌤️",
+        "calendar": "📅", "notion": "📝", "use_tool": "🔧", "done": "✅",
+    }
+    result: list[str] = []
+    for raw in steps:
+        line = str(raw).strip()
+        if not line:
+            continue
+        icon = "▸"
+        low = line.lower()
+        for key, ic in icons.items():
+            if key in low:
+                icon = ic
+                break
+        if "\n→" in line:
+            header, rest = line.split("\n→", 1)
+            result.append(f"{icon} {header.strip()}")
+            rest = rest.strip()
+            if rest and rest not in ("[OK]", ""):
+                result.append(f"  └─ {rest[:180]}{'…' if len(rest)>180 else ''}")
+        else:
+            result.append(f"{icon} {line}")
+    return result
+
+
 async def _check_complexity(raw_input: str) -> float:
     from my_agent_os.agent_core.crew.protocols import confidence_check
     try:
@@ -225,7 +256,15 @@ async def _route_via_agentic(
         result = {"answer": raw_response.strip(), "steps": [], "tool_results": []}
 
     answer = result.get("answer") or "(no answer)"
-    parsed = {"answer": sanitize_output(answer), "sources": None, "next_actions": [], "route_path": "agentic"}
+    steps = result.get("steps") or []
+    agent_trace = _format_trace(steps) if steps else None
+    parsed = {
+        "answer": sanitize_output(answer),
+        "sources": None,
+        "next_actions": [],
+        "route_path": "agentic",
+        "agent_trace": agent_trace,
+    }
 
     if _memory_engine:
         _memory_engine.process_turn_background(user_id, raw_input, answer)

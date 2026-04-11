@@ -27,6 +27,7 @@ class ConsoleResponse(BaseModel):
     sources: list[dict] | None = None
     next_actions: list[str]
     crew_views: dict[str, str] | None = None
+    agent_trace: list[str] | None = None  # step-by-step trace from agentic loop
 
 
 def _coerce_console_payload(result: dict[str, Any]) -> dict[str, Any]:
@@ -54,11 +55,17 @@ def _coerce_console_payload(result: dict[str, Any]) -> dict[str, Any]:
     if isinstance(raw_crew, dict) and raw_crew:
         crew_views = {str(k): str(v) for k, v in raw_crew.items() if v is not None}
 
+    raw_trace = result.get("agent_trace")
+    agent_trace: list[str] | None = None
+    if isinstance(raw_trace, list) and raw_trace:
+        agent_trace = [str(s) for s in raw_trace if s]
+
     return {
         "answer": answer,
         "sources": sources,
         "next_actions": next_actions,
         "crew_views": crew_views,
+        "agent_trace": agent_trace,
     }
 
 

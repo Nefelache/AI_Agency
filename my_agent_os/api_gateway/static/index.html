@@ -183,6 +183,28 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .crew-view{padding:8px 12px;border-radius:var(--radius-sm);background:#1a1a2e;border:1px solid #2d2d5e;font-size:12px;line-height:1.6}
 .crew-view .dept{font-size:10px;font-weight:600;color:var(--mem-ep);font-family:var(--mono);text-transform:uppercase;margin-bottom:3px}
 
+/* ─── Agent Trace (Agentic Loop steps) ──────────── */
+.agent-trace{
+  margin-top:10px;padding-top:8px;border-top:1px solid var(--border-dim);
+}
+.trace-toggle{
+  font-size:11px;color:var(--text-muted);cursor:pointer;user-select:none;
+  display:flex;align-items:center;gap:5px;transition:color var(--trans);
+}
+.trace-toggle:hover{color:var(--text-dim)}
+.trace-toggle .trace-count{
+  font-family:var(--mono);font-size:10px;
+  background:var(--surface);border:1px solid var(--border);
+  padding:0 5px;border-radius:10px;color:var(--text-muted);
+}
+.trace-steps{display:flex;flex-direction:column;gap:2px;margin-top:7px}
+.trace-steps.hidden{display:none}
+.trace-step{
+  font-size:11px;color:var(--text-muted);line-height:1.5;
+  padding:2px 0;font-family:var(--mono);
+}
+.trace-step.indent{padding-left:14px;color:var(--text-muted);opacity:.7}
+
 .typing{
   padding:8px 20px;display:flex;align-items:center;gap:14px;
 }
@@ -859,20 +881,36 @@ function renderMd(raw) {
 }
 
 // ── Message rendering ─────────────────────────────
-function appendMsg(role, content, actions, crewViews) {
+function appendMsg(role, content, actions, crewViews, agentTrace) {
   welcomeEl.style.display = 'none';
-  activeMessages.push({ role, content, actions: actions||[], crewViews });
+  activeMessages.push({ role, content, actions: actions||[], crewViews, agentTrace });
   saveSession();
-  _renderMsg(role, content, actions, crewViews);
+  _renderMsg(role, content, actions, crewViews, agentTrace);
 }
 
-function _renderMsg(role, content, actions, crewViews) {
+function _renderMsg(role, content, actions, crewViews, agentTrace) {
   const row = document.createElement('div');
   row.className = `msg-row ${role}`;
 
   const initials = role === 'user' ? 'U' : 'A';
   let html = `<div class="avatar">${initials}</div><div class="msg-body">`;
   html += `<div class="msg-name">${role === 'user' ? 'You' : 'Agent OS'}</div>`;
+
+  // Agent trace (shown above answer when agentic loop ran)
+  if (role === 'agent' && agentTrace && agentTrace.length) {
+    const uid = 'tr' + Date.now();
+    html += `<div class="agent-trace">
+      <span class="trace-toggle" onclick="document.getElementById('${uid}').classList.toggle('hidden')">
+        ▾ Agent Steps <span class="trace-count">${agentTrace.length}</span>
+      </span>
+      <div class="trace-steps" id="${uid}">`;
+    agentTrace.forEach(step => {
+      const isIndent = step.startsWith('  └─');
+      html += `<div class="trace-step${isIndent?' indent':''}">${esc(step)}</div>`;
+    });
+    html += '</div></div>';
+  }
+
   html += `<div class="msg-content">${role === 'agent' ? renderMd(content) : esc(content).replace(/\n/g,'<br>')}</div>`;
 
   if (actions && actions.length) {
@@ -955,7 +993,7 @@ async function send() {
     setAuth(true);
     const d = await r.json();
     const answer = d.answer || d.brief || '(no response)';
-    appendMsg('agent', answer, d.next_actions||[], d.crew_views||null);
+    appendMsg('agent', answer, d.next_actions||[], d.crew_views||null, d.agent_trace||null);
     document.getElementById('chat-title').textContent = text.slice(0, 45) || 'Chat';
 
     if (memPanel.classList.contains('open')) {

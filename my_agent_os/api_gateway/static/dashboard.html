@@ -1057,20 +1057,37 @@ function chatLoadSession(id) {
   document.getElementById('chat-current-title').textContent = s.preview || 'Chat';
   renderChatSessions();
 }
-function chatAppendMsg(role, content, actions, crewViews) {
+function chatAppendMsg(role, content, actions, crewViews, agentTrace) {
   document.getElementById('chat-welcome')?.remove();
-  _activeMsgs.push({ role, content, actions: actions || [], crewViews });
+  _activeMsgs.push({ role, content, actions: actions || [], crewViews, agentTrace });
   _chatSave();
-  _chatRenderMsg(role, content, actions, crewViews);
+  _chatRenderMsg(role, content, actions, crewViews, agentTrace);
 }
-function _chatRenderMsg(role, content, actions, crewViews) {
+function _chatRenderMsg(role, content, actions, crewViews, agentTrace) {
   const area = document.getElementById('chat-messages');
   const initials = role === 'user' ? 'U' : 'A';
   let html = `<div class="msg-row ${role}">
     <div class="msg-avatar">${initials}</div>
     <div class="msg-body">
-      <div class="msg-role">${role === 'user' ? 'You' : 'Agent OS'}</div>
-      <div class="msg-content">${role === 'agent' ? renderMd(content) : esc(content).replace(/\n/g,'<br>')}</div>`;
+      <div class="msg-role">${role === 'user' ? 'You' : 'Agent OS'}</div>`;
+
+  // Agent trace block (agentic loop steps)
+  if (role === 'agent' && agentTrace && agentTrace.length) {
+    const uid = 'dtr' + Date.now();
+    html += `<div class="crew-panel" style="border-top-color:rgba(129,140,248,.2)">
+      <span class="crew-toggle" onclick="document.getElementById('${uid}').classList.toggle('hidden')" style="display:flex;align-items:center;gap:5px">
+        ▾ Agent Steps
+        <span style="font-family:var(--mono);font-size:10px;background:var(--surface);border:1px solid var(--border);padding:0 5px;border-radius:10px;color:var(--text-muted)">${agentTrace.length}</span>
+      </span>
+      <div class="crew-views hidden" id="${uid}">`;
+    agentTrace.forEach(step => {
+      const isIndent = step.startsWith('  └─');
+      html += `<div style="font-family:var(--mono);font-size:11px;color:${isIndent?'var(--text-muted)':'var(--text-dim)'};line-height:1.5;padding:1px 0${isIndent?';padding-left:12px;opacity:.7':''}">${esc(step)}</div>`;
+    });
+    html += '</div></div>';
+  }
+
+  html += `<div class="msg-content">${role === 'agent' ? renderMd(content) : esc(content).replace(/\n/g,'<br>')}</div>`;
   if (actions && actions.length) {
     html += '<div class="next-actions">' + actions.map(a => `<button class="action-chip" onclick="chatFill(${JSON.stringify(a)})">${esc(a)}</button>`).join('') + '</div>';
   }
@@ -1123,7 +1140,7 @@ async function chatSend() {
     if (!r.ok) { chatAppendMsg('agent', `Request failed (${r.status}).`, [], null); return; }
     setAuthed(true);
     const d = await r.json();
-    chatAppendMsg('agent', d.answer || d.brief || '(empty)', d.next_actions || [], d.crew_views || null);
+    chatAppendMsg('agent', d.answer || d.brief || '(empty)', d.next_actions || [], d.crew_views || null, d.agent_trace || null);
   } catch (e) {
     _chatHideTyping();
     chatAppendMsg('agent', 'Connection failed: ' + e.message, [], null);
