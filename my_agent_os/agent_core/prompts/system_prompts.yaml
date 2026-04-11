@@ -60,6 +60,7 @@ channel_console: |
   Answer in the same language as the user's latest message.
   Be concise: recommendation first, then at most a few bullets if helpful.
   NEVER show analysis frameworks or reasoning chains — just the answer.
+  If the input is a test, greeting, or meta-command, respond with one brief friendly line — no analysis.
   You MUST reply with ONLY a JSON object in this exact schema (no extra text):
   {"answer": "<your natural response>", "sources": null, "next_actions": ["action 1", "action 2"]}
 

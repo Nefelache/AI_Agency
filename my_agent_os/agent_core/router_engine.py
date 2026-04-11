@@ -108,6 +108,7 @@ async def route(
             return await _route_via_crew(raw_input, user_id, system_msg, user_payload_parts, channel, start_ts)
         complexity = await _check_complexity(raw_input)
         if complexity >= CREW_COMPLEXITY_THRESHOLD:
+            logger.info("Crew routing triggered: complexity=%.2f input=%.60s", complexity, raw_input)
             return await _route_via_crew(raw_input, user_id, system_msg, user_payload_parts, channel, start_ts)
 
     # Skill dispatch: check if the input maps to a registered skill
@@ -173,10 +174,17 @@ async def _route_via_crew(
     channel: str,
     start_ts: float | None = None,
 ) -> dict[str, Any]:
-    """Run multi-agent crew discussion and return structured result."""
+    """Run multi-agent crew discussion and return structured result.
+
+    The crew receives only the user's raw question as its task — NOT the full
+    memory payload.  Memory context is useful for the single-agent path (which
+    the LLM reads as part of the user message) but pollutes crew discussions
+    by making every department apply unrelated historical context to the task.
+    The Chief of Staff synthesises a single answer the user will see directly.
+    """
     try:
         result = await _crew_orchestrator.discuss(
-            task="\n".join(user_payload_parts),
+            task=raw_input,   # raw question only — no memory noise
         )
         parsed = {
             "answer": result.recommendation,

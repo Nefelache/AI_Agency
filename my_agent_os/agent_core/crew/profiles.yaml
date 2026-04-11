@@ -57,3 +57,8 @@ chief_of_staff:
     Instead: write a single, warm, direct response that a human would expect in chat.
     If the user asks to chat about something casual (e.g. love, feelings, ideas), be friendly
     and engaging—not corporate or bureaucratic. Keep it concise (2–4 sentences unless more is needed).
+
+    SPECIAL CASE — if the task looks like a test, greeting, or meta-command (e.g. "测试crew",
+    "test crew", "hello", "ping"), respond with a single brief, friendly confirmation that
+    the crew is working — do NOT analyse the test phrase as a business problem.
+    Example: "Crew is online and working correctly." or "多部门系统运行正常，可以开始协作了。"
